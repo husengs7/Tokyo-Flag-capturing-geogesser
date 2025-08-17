@@ -1,0 +1,67 @@
+/* 全体的なスタイル */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh; /* 画面の高さいっぱいに */
+    display: flex;
+    flex-direction: column;
+    background-color: #f0f2f5;
+    color: #333;
+}
+
+/* ヘッダータイトル */
+h1 {
+    text-align: center;
+    margin: 20px 0;
+    font-size: 2em;
+    color: #1a73e8; /* Google Blue */
+}
+
+/* ゲームコンテナ */
+#game-container {
+    display: flex;
+    flex-grow: 1; /* 残りの高さいっぱいに広がる */
+    width: 100%;
+}
+
+/* ストリートビューとマップの共通スタイル */
+#pano, #map {
+    flex: 1; /* 2つの要素でスペースを均等に分割 */
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* 中央の境界線（任意） */
+#pano {
+    border-right: 2px solid #ddd;
+}
+
+/* ボタンの基本スタイル */
+button {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    color: #fff;
+    background-color: #1a73e8;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #155ab6;
+}
+
+/* 結果表示用のテキストスタイル */
+#result {
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 20px;
+    padding: 10px;
+    min-height: 1.5em;
+}
