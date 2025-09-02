@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>東京5kmチャレンジ</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <h1>東京5kmチャレンジ</h1>
+    <div id="game-container">
+        <div id="pano"></div>
+        <div id="map"></div>
+    </div>
+    <div id="result"></div>
+    <button id="guess-button">GUESS</button>
+
+    <script src="script.js"></script>
+    <script>
+        // APIキーをサーバーから取得してGoogle Maps APIを読み込む
+        fetch('/api/config')
+            .then(response => response.json())
+            .then(config => {
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsApiKey}&callback=initMap&libraries=geometry`;
+                script.async = true;
+                script.defer = true;
+                document.head.appendChild(script);
+            })
+            .catch(error => {
+                console.error('Failed to load API configuration:', error);
+            });
+    </script>
+</body>
+
+</html>
