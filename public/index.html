@@ -17,21 +17,7 @@
     <button id="guess-button">GUESS</button>
 
     <script src="script.js"></script>
-    <script>
-        // APIキーをサーバーから取得してGoogle Maps APIを読み込む
-        fetch('/api/config')
-            .then(response => response.json())
-            .then(config => {
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsApiKey}&callback=initMap&libraries=geometry`;
-                script.async = true;
-                script.defer = true;
-                document.head.appendChild(script);
-            })
-            .catch(error => {
-                console.error('Failed to load API configuration:', error);
-            });
-    </script>
+    <script src="/api/maps-script"></script>
 </body>
 
 </html>

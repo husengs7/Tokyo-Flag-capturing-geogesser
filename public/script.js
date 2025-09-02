@@ -48,14 +48,23 @@ function setRandomLocation() {
     const randomLng = 139.34 + Math.random() * 0.45; // 139.34-139.79
     const randomLocation = { lat: randomLat, lng: randomLng };
     
-    // ストリートビューデータ存在確認
-    streetViewService.getPanorama({
-        location: randomLocation,
-        radius: 1000
-    }, (data, status) => {
-        if (status === 'OK') {
+    // ストリートビューデータ存在確認（プロキシ経由）
+    fetch('/api/streetview/check', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            lat: randomLocation.lat,
+            lng: randomLocation.lng,
+            radius: 1000
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'OK') {
             // ストリートビューが存在する場合
-            targetLocation = data.location.latLng;
+            targetLocation = new google.maps.LatLng(data.location.lat, data.location.lng);
             
             // フラッグマーカー設置
             if (flagMarker) flagMarker.setMap(null);
@@ -82,6 +91,11 @@ function setRandomLocation() {
             retryCount++;
             setRandomLocation();
         }
+    })
+    .catch(error => {
+        console.error('Street View check error:', error);
+        retryCount++;
+        setRandomLocation();
     });
 }
 
@@ -109,17 +123,31 @@ function setPlayerStartPosition() {
             return;
         }
         
-        // ストリートビューが利用可能かチェック
-        streetViewService.getPanorama({
-            location: startPos,
-            radius: 1000
-        }, (data, status) => {
-            if (status === 'OK') {
-                panorama.setPosition(data.location.latLng);
+        // ストリートビューが利用可能かチェック（プロキシ経由）
+        fetch('/api/streetview/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                lat: startPos.lat(),
+                lng: startPos.lng(),
+                radius: 1000
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'OK') {
+                panorama.setPosition(new google.maps.LatLng(data.location.lat, data.location.lng));
             } else {
                 attempts++;
                 trySetPosition();
             }
+        })
+        .catch(error => {
+            console.error('Street View check error:', error);
+            attempts++;
+            trySetPosition();
         });
     }
     
@@ -131,9 +159,26 @@ function makeGuess() {
     const currentPos = panorama.getPosition();
     if (!currentPos || !targetLocation) return;
     
-    // 距離計算（メートル）
-    const distance = google.maps.geometry.spherical.computeDistanceBetween(currentPos, targetLocation);
-    
-    // 結果表示
-    document.getElementById('result').innerHTML = `距離: ${Math.round(distance)}m`;
+    // 距離計算（プロキシ経由）
+    fetch('/api/distance', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            lat1: currentPos.lat(),
+            lng1: currentPos.lng(),
+            lat2: targetLocation.lat(),
+            lng2: targetLocation.lng()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 結果表示
+        document.getElementById('result').innerHTML = `距離: ${data.distance}m`;
+    })
+    .catch(error => {
+        console.error('Distance calculation error:', error);
+        document.getElementById('result').innerHTML = '距離計算エラー';
+    });
 }
