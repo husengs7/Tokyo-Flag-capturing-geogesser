@@ -93,7 +93,7 @@ function setRandomLocation() {
             }
         })
         .catch(error => {
-            console.error('Street View check error:', error);
+            console.error('ストリートビュー確認エラー:', error);
             retryCount++;
             setRandomLocation();
         });
@@ -145,7 +145,7 @@ function setPlayerStartPosition() {
                 }
             })
             .catch(error => {
-                console.error('Street View check error:', error);
+                console.error('ストリートビュー確認エラー:', error);
                 attempts++;
                 trySetPosition();
             });
@@ -178,7 +178,7 @@ function makeGuess() {
             document.getElementById('result').innerHTML = `距離: ${data.distance}m`;
         })
         .catch(error => {
-            console.error('Distance calculation error:', error);
+            console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
         });
 }
