@@ -9,6 +9,14 @@ let connectionLine;
 let retryCount = 0;
 const MAX_RETRIES = 10;
 
+// 東京23区の境界定義（より正確な範囲）
+const TOKYO_23_WARDS_BOUNDS = {
+    north: 35.8986,  // 足立区北端
+    south: 35.4769,  // 大田区南端
+    west: 139.5500,  // 世田谷区西端
+    east: 139.9417   // 葛飾区東端
+};
+
 // ゲーム初期化
 function initMap() {
     // 東京中心座標
@@ -27,12 +35,12 @@ function initMap() {
     // ストリートビュー初期化
     panorama = new google.maps.StreetViewPanorama(
         document.getElementById("pano"), {
-            position: tokyo,
-            pov: { heading: 34, pitch: 10 },
-            addressControl: false,
-            linksControl: false,
-            showRoadLabels: false
-        }
+        position: tokyo,
+        pov: { heading: 34, pitch: 10 },
+        addressControl: false,
+        linksControl: false,
+        showRoadLabels: false
+    }
     );
 
     // ストリートビューサービス初期化
@@ -52,9 +60,9 @@ function setRandomLocation() {
         return;
     }
 
-    // 東京都内のランダム座標生成
-    const randomLat = 35.53 + Math.random() * 0.35; // 35.53-35.88
-    const randomLng = 139.34 + Math.random() * 0.45; // 139.34-139.79
+    // 東京23区内のランダム座標生成
+    const randomLat = TOKYO_23_WARDS_BOUNDS.south + Math.random() * (TOKYO_23_WARDS_BOUNDS.north - TOKYO_23_WARDS_BOUNDS.south);
+    const randomLng = TOKYO_23_WARDS_BOUNDS.west + Math.random() * (TOKYO_23_WARDS_BOUNDS.east - TOKYO_23_WARDS_BOUNDS.west);
     const randomLocation = { lat: randomLat, lng: randomLng };
 
     // ストリートビューデータ存在確認（プロキシ経由）
@@ -91,11 +99,11 @@ function setRandomLocation() {
                     }
                 });
 
-                // マップをフラッグ中心に調整（5km圏内が見える縮尺）
+                // マップをフラッグ中心に調整（2km圏内が見える縮尺）
                 map.setCenter(targetLocation);
-                map.setZoom(12);
+                map.setZoom(14);
 
-                // プレイヤーのスタート位置を5km圏内に設定
+                // プレイヤーのスタート位置を2km圏内に設定
                 setPlayerStartPosition();
 
                 retryCount = 0;
@@ -124,13 +132,14 @@ function setPlayerStartPosition() {
             return;
         }
 
-        // フラッグから5km圏内のランダムな位置を生成
+        // フラッグから2km圏内のランダムな位置を生成
         const angle = Math.random() * 2 * Math.PI;
-        const distance = Math.random() * 5000;
+        const distance = Math.random() * 2000;
         const startPos = google.maps.geometry.spherical.computeOffset(targetLocation, distance, angle * 180 / Math.PI);
 
-        // 東京都内かチェック
-        if (startPos.lat() < 35.53 || startPos.lat() > 35.88 || startPos.lng() < 139.34 || startPos.lng() > 139.79) {
+        // 東京23区内かチェック
+        if (startPos.lat() < TOKYO_23_WARDS_BOUNDS.south || startPos.lat() > TOKYO_23_WARDS_BOUNDS.north ||
+            startPos.lng() < TOKYO_23_WARDS_BOUNDS.west || startPos.lng() > TOKYO_23_WARDS_BOUNDS.east) {
             attempts++;
             trySetPosition();
             return;
@@ -188,7 +197,7 @@ function makeGuess() {
             scaledSize: new google.maps.Size(32, 32)
         }
     });
-    
+
     // フラッグとプレイヤー位置を結ぶ破線を描画
     if (connectionLine) connectionLine.setMap(null);
     connectionLine = new google.maps.Polyline({
@@ -208,7 +217,7 @@ function makeGuess() {
         }]
     });
     connectionLine.setMap(map);
-    
+
     // マップビューを両点が見えるように調整
     const bounds = new google.maps.LatLngBounds();
     bounds.extend(currentPos);
