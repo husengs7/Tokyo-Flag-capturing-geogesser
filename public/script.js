@@ -4,6 +4,8 @@ let panorama;
 let streetViewService;
 let targetLocation;
 let flagMarker;
+let playerMarker;
+let connectionLine;
 let retryCount = 0;
 const MAX_RETRIES = 10;
 
@@ -15,15 +17,22 @@ function initMap() {
     // マップ初期化
     map = new google.maps.Map(document.getElementById("map"), {
         zoom: 12,
-        center: tokyo
+        center: tokyo,
+        streetViewControl: false,
+        scaleControl: true,
+        //mapTypeControl: false,
+        //fullscreenControl: false
     });
 
     // ストリートビュー初期化
     panorama = new google.maps.StreetViewPanorama(
         document.getElementById("pano"), {
-        position: tokyo,
-        pov: { heading: 34, pitch: 10 }
-    }
+            position: tokyo,
+            pov: { heading: 34, pitch: 10 },
+            addressControl: false,
+            linksControl: false,
+            showRoadLabels: false
+        }
     );
 
     // ストリートビューサービス初期化
@@ -81,6 +90,10 @@ function setRandomLocation() {
                         scaledSize: new google.maps.Size(32, 32)
                     }
                 });
+
+                // マップをフラッグ中心に調整（5km圏内が見える縮尺）
+                map.setCenter(targetLocation);
+                map.setZoom(12);
 
                 // プレイヤーのスタート位置を5km圏内に設定
                 setPlayerStartPosition();
@@ -158,6 +171,50 @@ function setPlayerStartPosition() {
 function makeGuess() {
     const currentPos = panorama.getPosition();
     if (!currentPos || !targetLocation) return;
+
+    // プレイヤー位置マーカーを表示
+    if (playerMarker) playerMarker.setMap(null);
+    playerMarker = new google.maps.Marker({
+        position: currentPos,
+        map: map,
+        title: "あなたの位置",
+        icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+                    <circle cx="16" cy="16" r="12" fill="blue" stroke="white" stroke-width="3"/>
+                    <circle cx="16" cy="16" r="6" fill="white"/>
+                </svg>
+            `),
+            scaledSize: new google.maps.Size(32, 32)
+        }
+    });
+    
+    // フラッグとプレイヤー位置を結ぶ破線を描画
+    if (connectionLine) connectionLine.setMap(null);
+    connectionLine = new google.maps.Polyline({
+        path: [currentPos, targetLocation],
+        geodesic: true,
+        strokeColor: '#000000',
+        strokeOpacity: 0.1,
+        strokeWeight: 2,
+        icons: [{
+            icon: {
+                path: 'M 0,-1 0,1',
+                strokeOpacity: 1,
+                scale: 4
+            },
+            offset: '0',
+            repeat: '20px'
+        }]
+    });
+    connectionLine.setMap(map);
+    
+    // マップビューを両点が見えるように調整
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(currentPos);
+    bounds.extend(targetLocation);
+    map.fitBounds(bounds);
+    map.setZoom(Math.min(map.getZoom(), 15));
 
     // 距離計算（プロキシ経由）
     fetch('/api/distance', {
