@@ -1,9 +1,14 @@
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
+const connectDB = require('./config/database');
+
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
+
+// データベース接続
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
