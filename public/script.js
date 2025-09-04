@@ -6,15 +6,25 @@ let targetLocation;
 let flagMarker;
 let playerMarker;
 let connectionLine;
+let hintCircle;
 let retryCount = 0;
+let hintUsed = false;
 const MAX_RETRIES = 10;
 
-// 東京23区の境界定義（より正確な範囲）
+// 東京23区の境界定義
 const TOKYO_23_WARDS_BOUNDS = {
     north: 35.8986,  // 足立区北端
     south: 35.4769,  // 大田区南端
     west: 139.5500,  // 世田谷区西端
     east: 139.9417   // 葛飾区東端
+};
+
+// 海を避けるための安全な境界（東京湾・多摩川河口を除外）
+const SAFE_LAND_BOUNDS = {
+    north: 35.8800,
+    south: 35.5300,  // 羽田空港周辺の海を避ける
+    west: 139.5800,  // 多摩川沿いを少し内陸に
+    east: 139.8500   // 東京湾を避ける
 };
 
 // ゲーム初期化
@@ -46,8 +56,9 @@ function initMap() {
     // ストリートビューサービス初期化
     streetViewService = new google.maps.StreetViewService();
 
-    // GUESSボタンイベント
+    // ボタンイベント
     document.getElementById('guess-button').addEventListener('click', makeGuess);
+    document.getElementById('hint-button').addEventListener('click', handleHint);
 
     // ゲーム開始
     setRandomLocation();
@@ -106,6 +117,13 @@ function setRandomLocation() {
                 // プレイヤーのスタート位置を2km圏内に設定
                 setPlayerStartPosition();
 
+                // ゲーム状態をリセット
+                hintUsed = false;
+                document.getElementById('guess-button').disabled = false;
+                document.getElementById('hint-button').disabled = false;
+                document.getElementById('result').innerHTML = '';
+                if (hintCircle) hintCircle.setMap(null);
+
                 retryCount = 0;
             } else {
                 // ストリートビューが存在しない場合は再試行
@@ -137,9 +155,9 @@ function setPlayerStartPosition() {
         const distance = Math.random() * 2000;
         const startPos = google.maps.geometry.spherical.computeOffset(targetLocation, distance, angle * 180 / Math.PI);
 
-        // 東京23区内かチェック
-        if (startPos.lat() < TOKYO_23_WARDS_BOUNDS.south || startPos.lat() > TOKYO_23_WARDS_BOUNDS.north ||
-            startPos.lng() < TOKYO_23_WARDS_BOUNDS.west || startPos.lng() > TOKYO_23_WARDS_BOUNDS.east) {
+        // 安全な陸地範囲内かチェック（海を避ける）
+        if (startPos.lat() < SAFE_LAND_BOUNDS.south || startPos.lat() > SAFE_LAND_BOUNDS.north ||
+            startPos.lng() < SAFE_LAND_BOUNDS.west || startPos.lng() > SAFE_LAND_BOUNDS.east) {
             attempts++;
             trySetPosition();
             return;
@@ -242,9 +260,60 @@ function makeGuess() {
         .then(data => {
             // 結果表示
             document.getElementById('result').innerHTML = `距離: ${data.distance}m`;
+            
+            // GUESSボタンとHINTボタンを無効化
+            document.getElementById('guess-button').disabled = true;
+            document.getElementById('hint-button').disabled = true;
         })
         .catch(error => {
             console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
         });
+}
+
+// HINTボタンの処理
+function handleHint() {
+    const currentPos = panorama.getPosition();
+    if (!currentPos || !targetLocation) return;
+
+    hintUsed = true;
+    showHintCircle(currentPos);
+    document.getElementById('hint-button').disabled = true;
+    document.getElementById('result').innerHTML = 'ヒント: オレンジの円の中にあなたがいます';
+}
+
+// ヒント円を表示（プレイヤーの位置を含む半径1kmの円をランダムな位置に描画）
+function showHintCircle(playerPos) {
+    // 既存のヒント円を削除
+    if (hintCircle) hintCircle.setMap(null);
+
+    // プレイヤー位置から最大800m離れたランダムな中心点を生成（円の半径1km内にプレイヤーが含まれるように）
+    const angle = Math.random() * 2 * Math.PI;
+    const distance = Math.random() * 800; // 0-800m
+    const circleCenter = google.maps.geometry.spherical.computeOffset(playerPos, distance, angle * 180 / Math.PI);
+
+    // 半径1kmのヒント円を描画（オレンジ色）
+    hintCircle = new google.maps.Circle({
+        strokeColor: '#ff6b35',
+        strokeOpacity: 0.6,
+        strokeWeight: 2,
+        fillColor: '#ff6b35',
+        fillOpacity: 0.2,
+        map: map,
+        center: circleCenter,
+        radius: 1000 // 1km
+    });
+}
+
+// ゲームリセット時の処理を更新
+function resetGame() {
+    hintUsed = false;
+    if (playerMarker) playerMarker.setMap(null);
+    if (connectionLine) connectionLine.setMap(null);
+    if (hintCircle) hintCircle.setMap(null);
+    if (flagMarker) flagMarker.setMap(null);
+    document.getElementById('guess-button').disabled = false;
+    document.getElementById('hint-button').disabled = false;
+    document.getElementById('result').innerHTML = '';
+    setRandomLocation();
 }

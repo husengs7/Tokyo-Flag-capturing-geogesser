@@ -13,8 +13,8 @@ body {
 /* ヘッダータイトル */
 h1 {
     text-align: center;
-    margin: 20px 0;
-    font-size: 2em;
+    margin: 10px 0;
+    font-size: 1.6em;
     color: #1a73e8; /* Google Blue */
 }
 
@@ -40,9 +40,9 @@ h1 {
 /* ボタンの基本スタイル */
 button {
     display: block;
-    margin: 20px auto;
-    padding: 10px 20px;
-    font-size: 1em;
+    margin: 10px auto;
+    padding: 8px 16px;
+    font-size: 0.9em;
     font-weight: bold;
     color: #fff;
     background-color: #1a73e8;
@@ -52,16 +52,50 @@ button {
     transition: background-color 0.3s;
 }
 
+/* GUESSボタンのスタイル*/
+#guess-button {
+    padding: 12px 24px;
+    font-size: 1.1em;
+    margin: 15px auto;
+}
+
 button:hover {
     background-color: #155ab6;
+}
+
+/* HINTボタンのスタイル */
+#hint-button {
+    background-color: #ff6b35;
+    font-size: 0.9em;
+    padding: 8px 16px;
+    margin: 15px 20px 10px auto;
+    display: block;
+    width: fit-content;
+}
+
+#hint-button:hover {
+    background-color: #e55a2e;
+}
+
+#hint-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* ゲームコンテナに相対位置を設定 */
+#game-container {
+    display: flex;
+    flex-grow: 1;
+    width: 100%;
+    position: relative;
 }
 
 /* 結果表示用のテキストスタイル */
 #result {
     text-align: center;
-    font-size: 1.2em;
+    font-size: 1.1em;
     font-weight: bold;
-    margin-top: 20px;
-    padding: 10px;
-    min-height: 1.5em;
+    margin-top: 10px;
+    padding: 5px;
+    min-height: 1.2em;
 }
