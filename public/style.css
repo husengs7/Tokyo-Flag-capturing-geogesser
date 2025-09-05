@@ -3,7 +3,8 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     margin: 0;
     padding: 0;
-    height: 100vh; /* 画面の高さいっぱいに */
+    height: 100vh;
+    /* 画面の高さいっぱいに */
     display: flex;
     flex-direction: column;
     background-color: #f0f2f5;
@@ -13,21 +14,25 @@ body {
 /* ヘッダータイトル */
 h1 {
     text-align: center;
-    margin: 15px 0;
-    font-size: 1.8em;
-    color: #1a73e8; /* Google Blue */
+    margin: 10px 0;
+    font-size: 1.6em;
+    color: #1a73e8;
+    /* Google Blue */
 }
 
 /* ゲームコンテナ */
 #game-container {
     display: flex;
-    flex-grow: 1; /* 残りの高さいっぱいに広がる */
+    flex-grow: 1;
+    /* 残りの高さいっぱいに広がる */
     width: 100%;
 }
 
 /* ストリートビューとマップの共通スタイル */
-#pano, #map {
-    flex: 1; /* 2つの要素でスペースを均等に分割 */
+#pano,
+#map {
+    flex: 1;
+    /* 2つの要素でスペースを均等に分割 */
     height: 100%;
     box-sizing: border-box;
 }
@@ -42,7 +47,7 @@ h1 {
     display: flex;
     justify-content: center;
     gap: 20px;
-    margin: 15px auto;
+    margin: 10px auto;
 }
 
 /* ボタンの基本スタイル */
@@ -74,20 +79,26 @@ button:hover {
 /* 結果表示用のテキストスタイル */
 #result {
     text-align: center;
-    font-size: 1.2em;
+    font-size: 1.1em;
     font-weight: bold;
-    margin-top: 15px;
-    padding: 8px;
-    min-height: 1.5em;
+    margin-top: 10px;
+    padding: 6px;
+    height: 2.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* 距離表示用のテキストスタイル */
 #distance-display {
     text-align: center;
-    font-size: 1.1em;
+    font-size: 1em;
     font-weight: bold;
     color: #ff6b35;
-    margin: 8px 0;
-    padding: 8px;
-    min-height: 1.2em;
+    margin: 6px 0;
+    padding: 6px;
+    height: 1.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

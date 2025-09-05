@@ -10,7 +10,9 @@ let distanceCircle;
 let distanceRevealed = false;
 let hintUsed = false;
 let retryCount = 0;
+let initialPlayerDistance = 0; // 初期位置とフラッグの距離
 const MAX_RETRIES = 10;
+const SCORE_CONSTANT = 3; // スコア計算の定数c
 
 // 東京23区の詳細な境界ポリゴン定義
 const TOKYO_23_WARDS_POLYGON = [
@@ -146,6 +148,19 @@ const isValidLocation = (lat, lng) => {
     return true;
 };
 
+// スコア計算関数
+const calculateScore = (finalDistance, initialDistance, hintWasUsed) => {
+    const maxScore = 5000;
+    const distanceRatio = finalDistance / initialDistance;
+    const exponentialTerm = Math.exp(-SCORE_CONSTANT * distanceRatio);
+    
+    if (hintWasUsed) {
+        return Math.round((maxScore / 1.2) * exponentialTerm);
+    } else {
+        return Math.round(maxScore * exponentialTerm);
+    }
+};
+
 // ゲーム初期化
 function initMap() {
     // 東京中心座標
@@ -257,9 +272,13 @@ function setRandomLocation() {
                 // ゲーム状態をリセット
                 distanceRevealed = false;
                 hintUsed = false;
+                initialPlayerDistance = 0;
+                document.getElementById('guess-button').disabled = false;
+                document.getElementById('guess-button').style.opacity = '1';
                 document.getElementById('reveal-distance-button').disabled = false;
                 document.getElementById('reveal-distance-button').style.opacity = '1';
                 document.getElementById('distance-display').innerHTML = '';
+                document.getElementById('result').innerHTML = '';
                 if (distanceCircle) {
                     distanceCircle.setMap(null);
                     distanceCircle = null;
@@ -318,7 +337,13 @@ function setPlayerStartPosition() {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'OK') {
-                    panorama.setPosition(new google.maps.LatLng(data.location.lat, data.location.lng));
+                    const playerStartPosition = new google.maps.LatLng(data.location.lat, data.location.lng);
+                    panorama.setPosition(playerStartPosition);
+                    
+                    // 初期距離を記録
+                    initialPlayerDistance = google.maps.geometry.spherical.computeDistanceBetween(
+                        playerStartPosition, targetLocation
+                    );
                 } else {
                     attempts++;
                     trySetPosition();
@@ -398,20 +423,36 @@ function makeGuess() {
     })
         .then(response => response.json())
         .then(data => {
+            // スコア計算
+            const score = calculateScore(data.distance, initialPlayerDistance, hintUsed);
+            
             // 結果表示
-            document.getElementById('result').innerHTML = `距離: ${data.distance}m`;
+            document.getElementById('result').innerHTML = `
+                距離: ${data.distance}m<br>
+                スコア: ${Math.round(score)}p
+            `;
 
-            // GUESSボタンを押したらReveal Distanceボタンを無効化
+            // GUESSボタンとReveal Distanceボタンを無効化
+            document.getElementById('guess-button').disabled = true;
+            document.getElementById('guess-button').style.opacity = '0.5';
             document.getElementById('reveal-distance-button').disabled = true;
             document.getElementById('reveal-distance-button').style.opacity = '0.5';
+            
+            // ヒントの距離表示を消去
+            document.getElementById('distance-display').innerHTML = '';
         })
         .catch(error => {
             console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
 
-            // エラー時でもReveal Distanceボタンを無効化
+            // エラー時でもGUESSボタンとReveal Distanceボタンを無効化
+            document.getElementById('guess-button').disabled = true;
+            document.getElementById('guess-button').style.opacity = '0.5';
             document.getElementById('reveal-distance-button').disabled = true;
             document.getElementById('reveal-distance-button').style.opacity = '0.5';
+            
+            // ヒントの距離表示を消去
+            document.getElementById('distance-display').innerHTML = '';
         });
 }
 
