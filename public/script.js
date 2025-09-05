@@ -6,6 +6,8 @@ let targetLocation;
 let flagMarker;
 let playerMarker;
 let connectionLine;
+let distanceCircle;
+let distanceRevealed = false;
 let retryCount = 0;
 const MAX_RETRIES = 10;
 
@@ -40,6 +42,9 @@ function initMap() {
 
     // GUESSボタンイベント
     document.getElementById('guess-button').addEventListener('click', makeGuess);
+    
+    // Reveal Distanceボタンイベント
+    document.getElementById('reveal-distance-button').addEventListener('click', revealDistance);
 
     // ゲーム開始
     setRandomLocation();
@@ -97,6 +102,16 @@ function setRandomLocation() {
 
                 // プレイヤーのスタート位置を5km圏内に設定
                 setPlayerStartPosition();
+
+                // ゲーム状態をリセット
+                distanceRevealed = false;
+                document.getElementById('reveal-distance-button').disabled = false;
+                document.getElementById('reveal-distance-button').style.opacity = '1';
+                document.getElementById('distance-display').innerHTML = '';
+                if (distanceCircle) {
+                    distanceCircle.setMap(null);
+                    distanceCircle = null;
+                }
 
                 retryCount = 0;
             } else {
@@ -237,5 +252,60 @@ function makeGuess() {
         .catch(error => {
             console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
+        });
+}
+
+// 距離表示機能
+function revealDistance() {
+    // 1回だけ使用可能
+    if (distanceRevealed) {
+        return;
+    }
+    
+    const currentPos = panorama.getPosition();
+    if (!currentPos || !targetLocation) {
+        return;
+    }
+    
+    // 距離計算（プロキシ経由）
+    fetch('/api/distance', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            lat1: currentPos.lat(),
+            lng1: currentPos.lng(),
+            lat2: targetLocation.lat(),
+            lng2: targetLocation.lng()
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            // 距離を表示
+            document.getElementById('distance-display').innerHTML = `目的地までの距離: ${data.distance}m`;
+            
+            // 赤い円を描画（フラッグを中心とする）
+            if (distanceCircle) distanceCircle.setMap(null);
+            distanceCircle = new google.maps.Circle({
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#FF0000',
+                fillOpacity: 0.1,
+                map: map,
+                center: targetLocation,
+                radius: data.distance
+            });
+            
+            // ボタンを無効化
+            const button = document.getElementById('reveal-distance-button');
+            button.disabled = true;
+            button.style.opacity = '0.5';
+            distanceRevealed = true;
+        })
+        .catch(error => {
+            console.error('距離計算エラー:', error);
+            document.getElementById('distance-display').innerHTML = '距離計算エラー';
         });
 }
