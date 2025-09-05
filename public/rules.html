@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>東京5kmチャレンジ - ルール</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .rules-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .rules-section {
+            margin-bottom: 30px;
+        }
+        
+        .rules-section h2 {
+            color: #1a73e8;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .rules-section h3 {
+            color: #ff6b35;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .rules-section p, .rules-section li {
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .rules-section ul {
+            padding-left: 20px;
+        }
+        
+        .highlight {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ff6b35;
+            margin: 15px 0;
+        }
+        
+        .start-game-button {
+            background-color: #28a745;
+            font-size: 1.2em;
+            padding: 15px 30px;
+            margin: 30px auto;
+            display: block;
+            text-decoration: none;
+            color: white;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+        }
+        
+        .start-game-button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>東京5kmチャレンジ - ルール説明</h1>
+    
+    <div class="rules-container">
+        <div class="rules-section">
+            <h2>🎯 ゲームの目的</h2>
+            <p>東京都内のランダムな地点に設置された<strong>赤いフラッグ</strong>を目指すゲームです。ストリートビューで街を探索し、フラッグの位置をできるだけ正確に特定してください。</p>
+        </div>
+        
+        <div class="rules-section">
+            <h2>📋 基本ルール</h2>
+            <ul>
+                <li><strong>スタート地点：</strong> フラッグから5km以内のランダムな地点からスタートします</li>
+                <li><strong>目標：</strong> ストリートビューを使って街を探索し、赤いフラッグを見つけてください</li>
+                <li><strong>操作方法：</strong> ストリートビューで自由に移動・回転して探索できます</li>
+                <li><strong>推測：</strong> フラッグの位置を特定したら「GUESS」ボタンを押してください</li>
+                <li><strong>結果：</strong> 現在位置とフラッグとの距離が表示されます</li>
+            </ul>
+        </div>
+        
+        <div class="rules-section">
+            <h2>🔍 特別機能</h2>
+            <h3>Reveal Distance機能</h3>
+            <p><strong>「Reveal Distance」</strong>ボタンを使用すると：</p>
+            <ul>
+                <li>現在位置からフラッグまでの正確な距離が表示されます</li>
+                <li>マップ上にフラッグを中心とした赤い円が描画されます（円の境界上にあなたがいます）</li>
+                <li><strong>注意：</strong> この機能は1ゲームにつき1回だけ使用可能です</li>
+            </ul>
+            
+            <div class="highlight">
+                <strong>💡 戦略のヒント：</strong><br>
+                Reveal Distance機能は戦略的に使用しましょう。ある程度探索してから使用することで、より効率的にフラッグを見つけることができます。
+            </div>
+        </div>
+        
+        <div class="rules-section">
+            <h2>🗺️ ゲーム画面の見方</h2>
+            <ul>
+                <li><strong>左半分：</strong> ストリートビュー（探索用）</li>
+                <li><strong>右半分：</strong> マップ（フラッグと現在位置が表示されます）</li>
+                <li><strong>赤いフラッグマーカー：</strong> 目的地</li>
+                <li><strong>青いマーカー：</strong> あなたの推測位置（GUESS後に表示）</li>
+                <li><strong>破線：</strong> フラッグと推測位置を結ぶ線（GUESS後に表示）</li>
+            </ul>
+        </div>
+        
+        <div class="rules-section">
+            <h2>🏆 スコアリング</h2>
+            <p>推測の精度は距離で測定されます。フラッグに近いほど良いスコアです！</p>
+            <ul>
+                <li><strong>素晴らしい：</strong> 100m以内</li>
+                <li><strong>良い：</strong> 500m以内</li>
+                <li><strong>まずまず：</strong> 1km以内</li>
+                <li><strong>要改善：</strong> 1km以上</li>
+            </ul>
+        </div>
+        
+        <div class="rules-section">
+            <h2>📱 操作のコツ</h2>
+            <ul>
+                <li>ストリートビューでは矢印キーやマウスドラッグで移動・回転できます</li>
+                <li>道路標識、建物、ランドマークを手がかりにしましょう</li>
+                <li>マップで大まかな位置関係を把握しましょう</li>
+                <li>Reveal Distance機能は慎重なタイミングで使用しましょう</li>
+            </ul>
+        </div>
+    </div>
+    
+    <a href="index.html" class="start-game-button">🎮 ゲームを開始する</a>
+</body>
+
+</html>
