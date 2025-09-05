@@ -5,6 +5,9 @@ if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
 
+// ルーター読み込み
+const indexRouter = require('./routes/index');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -109,10 +112,8 @@ app.post('/api/distance', (req, res) => {
     }
 });
 
-// フロントエンドのルーティング
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// ルーター使用
+app.use('/', indexRouter);
 
 app.listen(PORT, () => {
     console.log(`サーバーが http://localhost:${PORT} で起動しています`);
