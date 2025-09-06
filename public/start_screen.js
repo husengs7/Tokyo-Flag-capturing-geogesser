@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (playButton) {
         playButton.addEventListener('click', () => {
-            console.log('PLAY! button clicked, redirecting to game.html');
-            window.location.href = 'game.html';
+            console.log('PLAY! button clicked, redirecting to rules page');
+            window.location.href = '/rules';
         });
     } else {
         console.error('PLAY! button not found');

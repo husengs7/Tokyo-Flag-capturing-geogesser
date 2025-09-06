@@ -193,6 +193,11 @@ function initMap() {
 
     // Reveal Distanceボタンイベント
     document.getElementById('reveal-distance-button').addEventListener('click', revealDistance);
+    
+    // RESTARTボタンイベント
+    document.getElementById('restart-button').addEventListener('click', () => {
+        window.location.href = '/game';
+    });
 
     // ゲーム開始
     setRandomLocation();
@@ -273,10 +278,9 @@ function setRandomLocation() {
                 distanceRevealed = false;
                 hintUsed = false;
                 initialPlayerDistance = 0;
-                document.getElementById('guess-button').disabled = false;
-                document.getElementById('guess-button').style.opacity = '1';
-                document.getElementById('reveal-distance-button').disabled = false;
-                document.getElementById('reveal-distance-button').style.opacity = '1';
+                document.getElementById('guess-button').style.display = 'inline-block';
+                document.getElementById('reveal-distance-button').style.display = 'inline-block';
+                document.getElementById('restart-button').style.display = 'none';
                 document.getElementById('distance-display').innerHTML = '';
                 document.getElementById('result').innerHTML = '';
                 if (distanceCircle) {
@@ -432,11 +436,12 @@ function makeGuess() {
                 スコア: ${Math.round(score)}p
             `;
 
-            // GUESSボタンとReveal Distanceボタンを無効化
-            document.getElementById('guess-button').disabled = true;
-            document.getElementById('guess-button').style.opacity = '0.5';
-            document.getElementById('reveal-distance-button').disabled = true;
-            document.getElementById('reveal-distance-button').style.opacity = '0.5';
+            // GUESSボタンとReveal Distanceボタンを非表示
+            document.getElementById('guess-button').style.display = 'none';
+            document.getElementById('reveal-distance-button').style.display = 'none';
+            
+            // RESTARTボタンを表示
+            document.getElementById('restart-button').style.display = 'inline-block';
             
             // ヒントの距離表示を消去
             document.getElementById('distance-display').innerHTML = '';
@@ -445,11 +450,12 @@ function makeGuess() {
             console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
 
-            // エラー時でもGUESSボタンとReveal Distanceボタンを無効化
-            document.getElementById('guess-button').disabled = true;
-            document.getElementById('guess-button').style.opacity = '0.5';
-            document.getElementById('reveal-distance-button').disabled = true;
-            document.getElementById('reveal-distance-button').style.opacity = '0.5';
+            // エラー時でもGUESSボタンとReveal Distanceボタンを非表示
+            document.getElementById('guess-button').style.display = 'none';
+            document.getElementById('reveal-distance-button').style.display = 'none';
+            
+            // RESTARTボタンを表示
+            document.getElementById('restart-button').style.display = 'inline-block';
             
             // ヒントの距離表示を消去
             document.getElementById('distance-display').innerHTML = '';
