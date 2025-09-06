@@ -191,12 +191,17 @@ function initMap() {
     // GUESSボタンイベント
     document.getElementById('guess-button').addEventListener('click', makeGuess);
 
-    // Reveal Distanceボタンイベント
+    // HINTボタンイベント
     document.getElementById('reveal-distance-button').addEventListener('click', revealDistance);
     
     // RESTARTボタンイベント
     document.getElementById('restart-button').addEventListener('click', () => {
         window.location.href = '/game';
+    });
+    
+    // EXITボタンイベント
+    document.getElementById('exit-button').addEventListener('click', () => {
+        window.location.href = '/';
     });
 
     // ゲーム開始
@@ -436,12 +441,13 @@ function makeGuess() {
                 スコア: ${Math.round(score)}p
             `;
 
-            // GUESSボタンとReveal Distanceボタンを非表示
+            // GUESSボタンとHINTボタンを非表示
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
             
-            // RESTARTボタンを表示
+            // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
+            document.getElementById('exit-button').style.display = 'inline-block';
             
             // ヒントの距離表示を消去
             document.getElementById('distance-display').innerHTML = '';
@@ -450,12 +456,13 @@ function makeGuess() {
             console.error('距離計算エラー:', error);
             document.getElementById('result').innerHTML = '距離計算エラー';
 
-            // エラー時でもGUESSボタンとReveal Distanceボタンを非表示
+            // エラー時でもGUESSボタンとHINTボタンを非表示
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
             
-            // RESTARTボタンを表示
+            // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
+            document.getElementById('exit-button').style.display = 'inline-block';
             
             // ヒントの距離表示を消去
             document.getElementById('distance-display').innerHTML = '';
