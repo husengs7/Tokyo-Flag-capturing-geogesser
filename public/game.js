@@ -11,7 +11,9 @@ let distanceRevealed = false;
 let hintUsed = false;
 let retryCount = 0;
 let initialPlayerDistance = 0; // 初期位置とフラッグの距離
-let compassUpdateInterval = null;
+let hintUpdateInterval = null;
+let hintTimer = null;
+let hintCircle = null; // HINT専用の円を管理
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
@@ -209,44 +211,6 @@ function initMap() {
     setRandomLocation();
 }
 
-// 目的地への方角を計算する関数
-function calculateBearing(currentPos, targetPos) {
-    const lat1 = currentPos.lat() * Math.PI / 180;
-    const lat2 = targetPos.lat() * Math.PI / 180;
-    const deltaLng = (targetPos.lng() - currentPos.lng()) * Math.PI / 180;
-    
-    const y = Math.sin(deltaLng) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
-    
-    const bearing = Math.atan2(y, x) * 180 / Math.PI;
-    return (bearing + 360) % 360; // 0-360度の範囲に正規化
-}
-
-// コンパスの針を更新する関数
-function updateCompass() {
-    const currentPos = panorama.getPosition();
-    if (!currentPos || !targetLocation) {
-        return;
-    }
-    
-    const bearing = calculateBearing(currentPos, targetLocation);
-    const needle = document.getElementById('compass-needle');
-    needle.style.transform = `translateX(-50%) rotate(${bearing}deg)`;
-}
-
-// コンパス更新の定期実行を開始
-function startCompassUpdates() {
-    updateCompass(); // 初回実行
-    compassUpdateInterval = setInterval(updateCompass, 1000); // 1秒間隔で更新
-}
-
-// コンパス更新の定期実行を停止
-function stopCompassUpdates() {
-    if (compassUpdateInterval) {
-        clearInterval(compassUpdateInterval);
-        compassUpdateInterval = null;
-    }
-}
 
 // ランダム地点生成と検証
 function setRandomLocation() {
@@ -324,16 +288,22 @@ function setRandomLocation() {
                 hintUsed = false;
                 initialPlayerDistance = 0;
                 
-                // コンパス更新を開始
-                startCompassUpdates();
+                // HINT機能のタイマーをクリア
+                stopHintRealTimeUpdate();
+                
                 document.getElementById('guess-button').style.display = 'inline-block';
                 document.getElementById('reveal-distance-button').style.display = 'inline-block';
                 document.getElementById('restart-button').style.display = 'none';
                 document.getElementById('distance-display').innerHTML = '';
+                document.getElementById('distance-display').style.visibility = 'visible';
                 document.getElementById('result').innerHTML = '';
                 if (distanceCircle) {
                     distanceCircle.setMap(null);
                     distanceCircle = null;
+                }
+                if (hintCircle) {
+                    hintCircle.setMap(null);
+                    hintCircle = null;
                 }
 
                 retryCount = 0;
@@ -362,9 +332,9 @@ function setPlayerStartPosition() {
             return;
         }
 
-        // フラッグから3km圏内のランダムな位置を生成
+        // フラッグから300m～3km圏内のランダムな位置を生成
         const angle = Math.random() * 2 * Math.PI;
-        const distance = Math.random() * 3000;
+        const distance = 300 + Math.random() * 2700; // 300m～3000m
         const startPos = google.maps.geometry.spherical.computeOffset(targetLocation, distance, angle * 180 / Math.PI);
 
         // 東京23区内かつ水域でないかチェック
@@ -488,8 +458,8 @@ function makeGuess() {
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
             
-            // コンパス更新を停止
-            stopCompassUpdates();
+            // HINT機能のタイマーをクリア
+            stopHintRealTimeUpdate();
             
             // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
@@ -506,8 +476,8 @@ function makeGuess() {
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
             
-            // コンパス更新を停止
-            stopCompassUpdates();
+            // HINT機能のタイマーをクリア
+            stopHintRealTimeUpdate();
             
             // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
@@ -533,6 +503,47 @@ function revealDistance() {
         return;
     }
 
+    // 距離表示要素を表示状態にして、初回の距離計算とリアルタイム更新開始
+    document.getElementById('distance-display').style.visibility = 'visible';
+    
+    // 既存の円があれば色を元に戻す
+    if (hintCircle) {
+        hintCircle.setOptions({
+            strokeOpacity: 0.8,
+            fillOpacity: 0.1
+        });
+    }
+    
+    updateDistanceDisplay();
+    startHintRealTimeUpdate();
+
+    // ボタンを無効化
+    const button = document.getElementById('reveal-distance-button');
+    button.disabled = true;
+    button.style.opacity = '0.5';
+    distanceRevealed = true;
+
+    // 20秒後に更新を停止し表示を非表示
+    hintTimer = setTimeout(() => {
+        stopHintRealTimeUpdate();
+        document.getElementById('distance-display').style.visibility = 'hidden';
+        // 赤い円を透明にして非表示
+        if (hintCircle) {
+            hintCircle.setOptions({
+                strokeOpacity: 0,
+                fillOpacity: 0
+            });
+        }
+    }, 20000);
+}
+
+// 距離表示を更新する関数
+function updateDistanceDisplay() {
+    const currentPos = panorama.getPosition();
+    if (!currentPos || !targetLocation) {
+        return;
+    }
+
     // 距離計算（プロキシ経由）
     fetch('/api/distance', {
         method: 'POST',
@@ -551,27 +562,43 @@ function revealDistance() {
             // 距離を表示
             document.getElementById('distance-display').innerHTML = `目的地までの距離: ${data.distance}m`;
 
-            // 赤い円を描画（フラッグを中心とする）
-            if (distanceCircle) distanceCircle.setMap(null);
-            distanceCircle = new google.maps.Circle({
-                strokeColor: '#FF0000',
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-                fillColor: '#FF0000',
-                fillOpacity: 0.1,
-                map: map,
-                center: targetLocation,
-                radius: data.distance
-            });
-
-            // ボタンを無効化
-            const button = document.getElementById('reveal-distance-button');
-            button.disabled = true;
-            button.style.opacity = '0.5';
-            distanceRevealed = true;
+            // 赤い円を描画（フラッグを中心とする）- 初回のみ
+            if (!hintCircle) {
+                hintCircle = new google.maps.Circle({
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: '#FF0000',
+                    fillOpacity: 0.1,
+                    map: map,
+                    center: targetLocation,
+                    radius: data.distance
+                });
+            } else {
+                // 円の半径を更新
+                hintCircle.setRadius(data.distance);
+            }
         })
         .catch(error => {
             console.error('距離計算エラー:', error);
             document.getElementById('distance-display').innerHTML = '距離計算エラー';
         });
+}
+
+// HINT機能のリアルタイム更新を開始
+function startHintRealTimeUpdate() {
+    // 0.5秒間隔で距離を更新
+    hintUpdateInterval = setInterval(updateDistanceDisplay, 500);
+}
+
+// HINT機能のリアルタイム更新を停止
+function stopHintRealTimeUpdate() {
+    if (hintUpdateInterval) {
+        clearInterval(hintUpdateInterval);
+        hintUpdateInterval = null;
+    }
+    if (hintTimer) {
+        clearTimeout(hintTimer);
+        hintTimer = null;
+    }
 }
