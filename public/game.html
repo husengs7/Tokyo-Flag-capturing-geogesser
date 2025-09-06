@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>東京3kmチャレンジ</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="game.css">
+</head>
+
+<body>
+    <h1>東京3kmチャレンジ</h1>
+    <div style="text-align: center; margin-bottom: 10px;">
+        <a href="/rules" style="color: #1a73e8; text-decoration: none; font-weight: bold;">📋 ルール説明</a>
+    </div>
+    <div id="game-container">
+        <div id="pano"></div>
+        <div id="map"></div>
+    </div>
+    <div id="result"></div>
+    <div id="distance-display"></div>
+    <div id="button-container">
+        <button id="guess-button">GUESS</button>
+        <button id="reveal-distance-button">Reveal Distance</button>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="/api/maps-script"></script>
+</body>
+
+</html>

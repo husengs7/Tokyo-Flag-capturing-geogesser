@@ -1,30 +1,41 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="ja">
 <head>
-    <title>東京3kmチャレンジ</title>
-    <meta charset="utf-8">
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost Point Gesser - Start</title>
+    <link rel="stylesheet" href="start_screen.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
 </head>
-
 <body>
-    <h1>東京3kmチャレンジ</h1>
-    <div style="text-align: center; margin-bottom: 10px;">
-        <a href="/rules" style="color: #1a73e8; text-decoration: none; font-weight: bold;">📋 ルール説明</a>
-    </div>
-    <div id="game-container">
-        <div id="pano"></div>
-        <div id="map"></div>
-    </div>
-    <div id="result"></div>
-    <div id="distance-display"></div>
-    <div id="button-container">
-        <button id="guess-button">GUESS</button>
-        <button id="reveal-distance-button">Reveal Distance</button>
+    <div class="background-container">
+        <img src="images/imagesbackground.jpg" alt="City at night" class="background-image">
     </div>
 
-    <script src="script.js"></script>
-    <script src="/api/maps-script"></script>
+    <div class="container">
+        <h1 class="title">Lost Point Gesser</h1>
+
+        <div class="buttons-container">
+            <div class="button-box">
+                <img src="images/map.png" alt="Play" class="icon">
+                <div class="description">
+                    フラッグへ向かおう<br>東京のたびに出かけよう
+                </div>
+                <button class="btn play-btn">PLAY!</button>
+            </div>
+            
+            <div class="button-box">
+                <img src="images/minna.png" alt="Battle" class="icon">
+                <div class="description">
+                    オンラインで<br>みんなでゲッサー！！
+                </div>
+                <button class="btn battle-btn">BATTLE</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="start_screen.js"></script>
 </body>
-
 </html>
