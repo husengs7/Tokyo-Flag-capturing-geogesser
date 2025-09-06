@@ -11,6 +11,7 @@ let distanceRevealed = false;
 let hintUsed = false;
 let retryCount = 0;
 let initialPlayerDistance = 0; // 初期位置とフラッグの距離
+let compassUpdateInterval = null;
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
@@ -208,6 +209,45 @@ function initMap() {
     setRandomLocation();
 }
 
+// 目的地への方角を計算する関数
+function calculateBearing(currentPos, targetPos) {
+    const lat1 = currentPos.lat() * Math.PI / 180;
+    const lat2 = targetPos.lat() * Math.PI / 180;
+    const deltaLng = (targetPos.lng() - currentPos.lng()) * Math.PI / 180;
+    
+    const y = Math.sin(deltaLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+    
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360; // 0-360度の範囲に正規化
+}
+
+// コンパスの針を更新する関数
+function updateCompass() {
+    const currentPos = panorama.getPosition();
+    if (!currentPos || !targetLocation) {
+        return;
+    }
+    
+    const bearing = calculateBearing(currentPos, targetLocation);
+    const needle = document.getElementById('compass-needle');
+    needle.style.transform = `translateX(-50%) rotate(${bearing}deg)`;
+}
+
+// コンパス更新の定期実行を開始
+function startCompassUpdates() {
+    updateCompass(); // 初回実行
+    compassUpdateInterval = setInterval(updateCompass, 1000); // 1秒間隔で更新
+}
+
+// コンパス更新の定期実行を停止
+function stopCompassUpdates() {
+    if (compassUpdateInterval) {
+        clearInterval(compassUpdateInterval);
+        compassUpdateInterval = null;
+    }
+}
+
 // ランダム地点生成と検証
 function setRandomLocation() {
     if (retryCount >= MAX_RETRIES) {
@@ -283,6 +323,9 @@ function setRandomLocation() {
                 distanceRevealed = false;
                 hintUsed = false;
                 initialPlayerDistance = 0;
+                
+                // コンパス更新を開始
+                startCompassUpdates();
                 document.getElementById('guess-button').style.display = 'inline-block';
                 document.getElementById('reveal-distance-button').style.display = 'inline-block';
                 document.getElementById('restart-button').style.display = 'none';
@@ -445,6 +488,9 @@ function makeGuess() {
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
             
+            // コンパス更新を停止
+            stopCompassUpdates();
+            
             // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
             document.getElementById('exit-button').style.display = 'inline-block';
@@ -459,6 +505,9 @@ function makeGuess() {
             // エラー時でもGUESSボタンとHINTボタンを非表示
             document.getElementById('guess-button').style.display = 'none';
             document.getElementById('reveal-distance-button').style.display = 'none';
+            
+            // コンパス更新を停止
+            stopCompassUpdates();
             
             // RESTARTボタンとEXITボタンを表示
             document.getElementById('restart-button').style.display = 'inline-block';
