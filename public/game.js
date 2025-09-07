@@ -175,6 +175,11 @@ function initMap() {
         center: tokyo,
         streetViewControl: false,
         scaleControl: true,
+        mapTypeControl: false,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        mapTypeControlOptions: {
+            mapTypeIds: [google.maps.MapTypeId.ROADMAP]
+        }
     });
 
     // ストリートビュー初期化
