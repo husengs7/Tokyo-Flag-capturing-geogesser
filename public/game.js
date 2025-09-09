@@ -151,6 +151,53 @@ const isValidLocation = (lat, lng) => {
     return true;
 };
 
+// 主要道路周辺の優先座標範囲
+const MAJOR_ROAD_ZONES = [
+    // 山手線周辺エリア
+    { center: [35.681, 139.767], radius: 800, weight: 3 }, // 東京駅
+    { center: [35.689, 139.692], radius: 600, weight: 3 }, // 新宿駅
+    { center: [35.659, 139.701], radius: 600, weight: 3 }, // 渋谷駅
+    { center: [35.729, 139.731], radius: 500, weight: 2 }, // 池袋駅
+    { center: [35.630, 139.740], radius: 500, weight: 2 }, // 品川駅
+    { center: [35.670, 139.802], radius: 500, weight: 2 }, // 錦糸町駅
+    
+    // 主要幹線道路沿い
+    { center: [35.696, 139.614], radius: 400, weight: 2 }, // 環七沿い(杉並)
+    { center: [35.738, 139.669], radius: 400, weight: 2 }, // 環八沿い(板橋)
+    { center: [35.643, 139.716], radius: 400, weight: 2 }, // 目黒通り沿い
+    { center: [35.712, 139.610], radius: 400, weight: 2 }, // 青梅街道沿い
+    
+    // 商業地区
+    { center: [35.700, 139.773], radius: 300, weight: 1 }, // 上野
+    { center: [35.646, 139.710], radius: 300, weight: 1 }, // 恵比寿
+    { center: [35.665, 139.731], radius: 300, weight: 1 }, // 六本木
+    { center: [35.667, 139.650], radius: 300, weight: 1 }, // 下北沢
+];
+
+// 重み付きランダム座標生成
+const generateWeightedRandomLocation = () => {
+    // 重みに基づいてエリアを選択
+    const totalWeight = MAJOR_ROAD_ZONES.reduce((sum, zone) => sum + zone.weight, 0);
+    let randomWeight = Math.random() * totalWeight;
+    
+    let selectedZone = MAJOR_ROAD_ZONES[0];
+    for (const zone of MAJOR_ROAD_ZONES) {
+        randomWeight -= zone.weight;
+        if (randomWeight <= 0) {
+            selectedZone = zone;
+            break;
+        }
+    }
+    
+    // 選択されたエリア内でランダム座標生成
+    const angle = Math.random() * 2 * Math.PI;
+    const distance = Math.random() * selectedZone.radius;
+    const lat = selectedZone.center[0] + (distance * Math.cos(angle)) / 111320;
+    const lng = selectedZone.center[1] + (distance * Math.sin(angle)) / (111320 * Math.cos(selectedZone.center[0] * Math.PI / 180));
+    
+    return { lat, lng };
+};
+
 // スコア計算関数
 const calculateScore = (finalDistance, initialDistance, hintWasUsed) => {
     const maxScore = 5000;
@@ -231,12 +278,20 @@ function setRandomLocation() {
     const MAX_LOCATION_ATTEMPTS = 100;
 
     while (!validLocationFound && locationAttempts < MAX_LOCATION_ATTEMPTS) {
-        // 東京23区の境界内でランダム座標生成
-        const randomLat = 35.53 + Math.random() * 0.35; // 35.53-35.88
-        const randomLng = 139.34 + Math.random() * 0.54; // 139.34-139.88
+        // 80%の確率で主要道路周辺、20%の確率で従来のランダム生成
+        let candidateLocation;
+        if (Math.random() < 0.8) {
+            // 主要道路周辺の重み付き座標生成
+            candidateLocation = generateWeightedRandomLocation();
+        } else {
+            // 従来のランダム座標生成（フォールバック）
+            const randomLat = 35.53 + Math.random() * 0.35; // 35.53-35.88
+            const randomLng = 139.34 + Math.random() * 0.54; // 139.34-139.88
+            candidateLocation = { lat: randomLat, lng: randomLng };
+        }
 
-        if (isValidLocation(randomLat, randomLng)) {
-            randomLocation = { lat: randomLat, lng: randomLng };
+        if (isValidLocation(candidateLocation.lat, candidateLocation.lng)) {
+            randomLocation = candidateLocation;
             validLocationFound = true;
         }
         locationAttempts++;
@@ -256,7 +311,7 @@ function setRandomLocation() {
         body: JSON.stringify({
             lat: randomLocation.lat,
             lng: randomLocation.lng,
-            radius: 1000
+            radius: 500  // 半径を狭めて主要道路に限定
         })
     })
         .then(response => response.json())
@@ -358,7 +413,7 @@ function setPlayerStartPosition() {
             body: JSON.stringify({
                 lat: startPos.lat(),
                 lng: startPos.lng(),
-                radius: 1000
+                radius: 300  // スタート位置はより厳しく制限
             })
         })
             .then(response => response.json())

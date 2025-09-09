@@ -56,7 +56,8 @@ app.post('/api/streetview/check', async (req, res) => {
             params: {
                 key: process.env.GOOGLE_MAPS_API_KEY,
                 location: `${lat},${lng}`,
-                radius: radius
+                radius: radius,
+                source: 'outdoor'  // 屋外のストリートビューのみ
             }
         });
 
