@@ -17,8 +17,9 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'tokyo-geoguess-secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: { 
+    cookie: {
         secure: false, // HTTPSでない場合はfalse
+        httpOnly: true, // XSSに対するセキュリティ向上
         maxAge: 1000 * 60 * 60 * 24 // 24時間
     }
 }));
