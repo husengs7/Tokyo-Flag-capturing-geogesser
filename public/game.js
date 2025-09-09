@@ -11,6 +11,7 @@ let distanceRevealed = false;
 let hintUsed = false;
 let retryCount = 0;
 let initialPlayerDistance = 0; // 初期位置とフラッグの距離
+let gameId = null; // ゲームセッションID
 let hintUpdateInterval = null;
 let hintTimer = null;
 let hintCircle = null; // HINT専用の円を管理
@@ -198,18 +199,104 @@ const generateWeightedRandomLocation = () => {
     return { lat, lng };
 };
 
-// スコア計算関数
-const calculateScore = (finalDistance, initialDistance, hintWasUsed) => {
-    const maxScore = 5000;
-    const distanceRatio = finalDistance / initialDistance;
-    const exponentialTerm = Math.exp(-SCORE_CONSTANT * distanceRatio);
+// ゲームセッション開始
+function startGameSession(targetPos, playerPos) {
+    fetch('/api/game/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            targetLat: targetPos.lat(),
+            targetLng: targetPos.lng(),
+            playerLat: playerPos.lat(),
+            playerLng: playerPos.lng()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        gameId = data.gameId;
+        initialPlayerDistance = data.initialDistance;
+    })
+    .catch(error => {
+        console.error('ゲームセッション開始エラー:', error);
+    });
+}
+
+// ヒント使用記録
+function recordHintUsage() {
+    if (!gameId) return;
     
-    if (hintWasUsed) {
-        return Math.round((maxScore / 1.2) * exponentialTerm);
-    } else {
-        return Math.round(maxScore * exponentialTerm);
-    }
-};
+    fetch('/api/game/hint', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            gameId: gameId
+        })
+    })
+    .catch(error => {
+        console.error('ヒント記録エラー:', error);
+    });
+}
+
+// ゲーム完了・スコア計算
+function completeGame(finalLat, finalLng) {
+    if (!gameId) return;
+    
+    fetch('/api/game/complete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            gameId: gameId,
+            finalPlayerLat: finalLat,
+            finalPlayerLng: finalLng
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 結果表示
+        document.getElementById('result').innerHTML = `
+            距離: ${data.distance}m<br>
+            スコア: ${data.score}p
+        `;
+
+        // GUESSボタンとHINTボタンを非表示
+        document.getElementById('guess-button').style.display = 'none';
+        document.getElementById('reveal-distance-button').style.display = 'none';
+        
+        // HINT機能のタイマーをクリア
+        stopHintRealTimeUpdate();
+        
+        // RESTARTボタンとEXITボタンを表示
+        document.getElementById('restart-button').style.display = 'inline-block';
+        document.getElementById('exit-button').style.display = 'inline-block';
+        
+        // ヒントの距離表示を消去
+        document.getElementById('distance-display').innerHTML = '';
+    })
+    .catch(error => {
+        console.error('ゲーム完了エラー:', error);
+        document.getElementById('result').innerHTML = 'ゲーム完了エラー';
+
+        // エラー時でもGUESSボタンとHINTボタンを非表示
+        document.getElementById('guess-button').style.display = 'none';
+        document.getElementById('reveal-distance-button').style.display = 'none';
+        
+        // HINT機能のタイマーをクリア
+        stopHintRealTimeUpdate();
+        
+        // RESTARTボタンとEXITボタンを表示
+        document.getElementById('restart-button').style.display = 'inline-block';
+        document.getElementById('exit-button').style.display = 'inline-block';
+        
+        // ヒントの距離表示を消去
+        document.getElementById('distance-display').innerHTML = '';
+    });
+}
 
 // ゲーム初期化
 function initMap() {
@@ -422,10 +509,8 @@ function setPlayerStartPosition() {
                     const playerStartPosition = new google.maps.LatLng(data.location.lat, data.location.lng);
                     panorama.setPosition(playerStartPosition);
                     
-                    // 初期距離を記録
-                    initialPlayerDistance = google.maps.geometry.spherical.computeDistanceBetween(
-                        playerStartPosition, targetLocation
-                    );
+                    // ゲームセッション開始
+                    startGameSession(targetLocation, playerStartPosition);
                 } else {
                     attempts++;
                     trySetPosition();
@@ -490,62 +575,9 @@ function makeGuess() {
     map.fitBounds(bounds);
     map.setZoom(Math.min(map.getZoom(), 15));
 
-    // 距離計算（プロキシ経由）
-    fetch('/api/distance', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            lat1: currentPos.lat(),
-            lng1: currentPos.lng(),
-            lat2: targetLocation.lat(),
-            lng2: targetLocation.lng()
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            // スコア計算
-            const score = calculateScore(data.distance, initialPlayerDistance, hintUsed);
-            
-            // 結果表示
-            document.getElementById('result').innerHTML = `
-                距離: ${data.distance}m<br>
-                スコア: ${Math.round(score)}p
-            `;
+    // ゲーム完了・スコア計算
+    completeGame(currentPos.lat(), currentPos.lng());
 
-            // GUESSボタンとHINTボタンを非表示
-            document.getElementById('guess-button').style.display = 'none';
-            document.getElementById('reveal-distance-button').style.display = 'none';
-            
-            // HINT機能のタイマーをクリア
-            stopHintRealTimeUpdate();
-            
-            // RESTARTボタンとEXITボタンを表示
-            document.getElementById('restart-button').style.display = 'inline-block';
-            document.getElementById('exit-button').style.display = 'inline-block';
-            
-            // ヒントの距離表示を消去
-            document.getElementById('distance-display').innerHTML = '';
-        })
-        .catch(error => {
-            console.error('距離計算エラー:', error);
-            document.getElementById('result').innerHTML = '距離計算エラー';
-
-            // エラー時でもGUESSボタンとHINTボタンを非表示
-            document.getElementById('guess-button').style.display = 'none';
-            document.getElementById('reveal-distance-button').style.display = 'none';
-            
-            // HINT機能のタイマーをクリア
-            stopHintRealTimeUpdate();
-            
-            // RESTARTボタンとEXITボタンを表示
-            document.getElementById('restart-button').style.display = 'inline-block';
-            document.getElementById('exit-button').style.display = 'inline-block';
-            
-            // ヒントの距離表示を消去
-            document.getElementById('distance-display').innerHTML = '';
-        });
 }
 
 // 距離表示機能
@@ -557,6 +589,7 @@ function revealDistance() {
 
     // ヒント使用を記録
     hintUsed = true;
+    recordHintUsage();
 
     const currentPos = panorama.getPosition();
     if (!currentPos || !targetLocation) {
