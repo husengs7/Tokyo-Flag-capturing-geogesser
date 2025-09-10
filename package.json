@@ -20,9 +20,11 @@
   "homepage": "https://github.com/husengs7/Tokyo-Flag-capturing-geogesser#readme",
   "dependencies": {
     "axios": "^1.11.0",
+    "connect-mongo": "^5.1.0",
     "dotenv": "^17.2.1",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
+    "express-session": "^1.18.2",
     "mongoose": "^8.18.0",
     "nodemon": "^3.1.10"
   }
