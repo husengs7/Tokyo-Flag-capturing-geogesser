@@ -2,6 +2,9 @@ const express = require('express');
 const axios = require('axios');
 const { calculateDistance, validateCoordinates } = require('../services/utils');
 const GameService = require('../services/gameService');
+const User = require('../models/User');
+const GameRecord = require('../models/GameRecord');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -100,8 +103,8 @@ router.post('/game/start', async (req, res) => {
 
         // セッションに保存
         req.session.gameSession = gameSession;
-        
-        res.json({ 
+
+        res.json({
             gameId: gameSession.id,
             initialDistance: gameSession.initialDistance
         });
@@ -116,16 +119,16 @@ router.post('/game/hint', (req, res) => {
     try {
         const { gameId } = req.body;
         let gameSession = req.session.gameSession;
-        
+
         // セッション検証
         if (!GameService.validateGameSession(gameSession, gameId)) {
             return res.status(400).json({ error: '無効なゲームセッションです' });
         }
-        
+
         // ヒント使用を記録
         gameSession = GameService.recordHintUsage(gameSession);
         req.session.gameSession = gameSession;
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('ヒント記録エラー:', error);
@@ -134,30 +137,68 @@ router.post('/game/hint', (req, res) => {
 });
 
 // ゲーム完了・スコア計算
-router.post('/game/complete', (req, res) => {
+router.post('/game/complete', optionalAuth, async (req, res) => {
     try {
         const { gameId, finalPlayerLat, finalPlayerLng } = req.body;
         let gameSession = req.session.gameSession;
-        
+
         // セッション検証
         if (!GameService.validateGameSession(gameSession, gameId)) {
             return res.status(400).json({ error: '無効なゲームセッションです' });
         }
-        
+
         // 入力値検証
         if (!validateCoordinates(finalPlayerLat, finalPlayerLng)) {
             return res.status(400).json({ error: '無効な座標です' });
         }
-        
+
         // ゲーム完了処理
         const result = GameService.completeGame(gameSession, finalPlayerLat, finalPlayerLng);
         if (!result) {
             return res.status(500).json({ error: 'ゲームの完了処理に失敗しました' });
         }
-        
+
+        // ログインユーザーの場合、スコア更新とゲーム履歴保存
+        if (req.isAuthenticated() && req.user) {
+            try {
+                // ベストスコア更新
+                if (result.score > req.user.bestScore) {
+                    await User.findByIdAndUpdate(req.user._id, {
+                        bestScore: result.score
+                    });
+                    result.isNewBestScore = true;
+                }
+
+                // ゲーム履歴を保存
+                const gameRecord = new GameRecord({
+                    userId: req.user._id,
+                    score: result.score,
+                    distance: result.finalDistance,
+                    hintsUsed: gameSession.hintsUsed,
+                    targetLocation: {
+                        lat: gameSession.targetLat,
+                        lng: gameSession.targetLng
+                    },
+                    playerGuess: {
+                        lat: finalPlayerLat,
+                        lng: finalPlayerLng
+                    },
+                    completedAt: new Date()
+                });
+
+                await gameRecord.save();
+                result.gameRecordId = gameRecord._id;
+
+            } catch (dbError) {
+                console.error('データベース更新エラー:', dbError);
+                // ゲーム結果は返すが、DBエラーは警告として記録
+                result.warning = 'スコアの保存に失敗しました';
+            }
+        }
+
         // セッション更新
         req.session.gameSession = gameSession;
-        
+
         res.json(result);
     } catch (error) {
         console.error('ゲーム完了エラー:', error);

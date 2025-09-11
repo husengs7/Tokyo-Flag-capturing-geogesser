@@ -1,4 +1,4 @@
-// MongoDB接続設定
+// MongoDB Atlas接続設定
 const mongoose = require('mongoose');
 
 // データベース接続関数

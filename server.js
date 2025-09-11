@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
+const passport = require('./config/passport');
 const connectDB = require('./config/database');
 
 if (process.env.NODE_ENV !== 'production') {
@@ -11,6 +12,7 @@ if (process.env.NODE_ENV !== 'production') {
 // ルーター読み込み
 const indexRouter = require('./routes/index');
 const apiRouter = require('./routes/api');
+const authRouter = require('./routes/auth');
 
 // データベース接続
 connectDB();
@@ -37,12 +39,17 @@ app.use(session({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Passport認証初期化
+app.use(passport.initialize());
+app.use(passport.session());
+
 // 静的ファイル提供
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ルーター使用
 app.use('/', indexRouter);
 app.use('/api', apiRouter);
+app.use('/auth', authRouter);
 
 app.listen(PORT, () => {
     console.log(`サーバーが http://localhost:${PORT} で起動しています`);
