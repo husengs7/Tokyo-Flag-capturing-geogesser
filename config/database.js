@@ -11,7 +11,7 @@ const connectDB = async () => {
         const conn = await mongoose.connect(mongoURI);
 
         // 接続成功時のログ出力
-        console.log(`MongoDB接続成功: ${conn.connection.host}`);
+        console.log(`MongoDB接続成功!!\nホスト: ${conn.connection.host}`);
     } catch (error) {
         // 接続失敗時のエラーハンドリング
         console.error('MongoDB接続エラー:', error);
