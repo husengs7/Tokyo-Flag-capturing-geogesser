@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オンラインプレイ - ログイン | Tokyo Flag Capturing Geoguesser</title>
+    <link rel="stylesheet" href="../online.css">
+</head>
+<body>
+    <div class="page-container">
+        <header class="page-header">
+            <h1 class="page-title">オンラインプレイ</h1>
+        </header>
+        
+        <main class="main-content">
+            <div class="auth-container" id="authContainer">
+                <div class="auth-box">
+                    <h2 id="authTitle" class="auth-title">ログイン</h2>
+                    
+                    <form id="authForm" class="auth-form">
+                        <div class="form-group">
+                            <input type="text" id="username" name="username" 
+                                   placeholder="ユーザー名" class="form-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="password" id="password" name="password" 
+                                   placeholder="パスワード" class="form-input" required>
+                        </div>
+                        
+                        <div class="form-group" id="confirmPasswordGroup" style="display: none;">
+                            <input type="password" id="confirmPassword" name="confirmPassword" 
+                                   placeholder="パスワード（確認用）" class="form-input">
+                        </div>
+                        
+                        <p id="errorMessage" class="error-message" style="display: none;"></p>
+                        
+                        <button type="submit" id="submitBtn" class="submit-btn">ログイン</button>
+                    </form>
+                    
+                    <div class="auth-switch">
+                        <a href="#" id="switchModeLink" class="switch-link">新規作成</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="../scripts/login.js"></script>
+</body>
+</html>
