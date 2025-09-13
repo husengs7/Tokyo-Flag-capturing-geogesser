@@ -4,9 +4,35 @@ const passportLocalMongoose = require('passport-local-mongoose'); // 認証機�
 
 // ユーザースキーマ定義
 const userSchema = new mongoose.Schema({
-    bestScore: {
-        type: Number,       // 最高スコア
-        default: 0          // デフォルト値は0
+    // ソロモード統計
+    soloStats: {
+        totalScore: {
+            type: Number,
+            default: 0
+        },
+        playCount: {
+            type: Number,
+            default: 0
+        },
+        bestScore: {
+            type: Number,
+            default: 0
+        }
+    },
+    // マルチモード統計
+    multiStats: {
+        totalScore: {
+            type: Number,
+            default: 0
+        },
+        playCount: {
+            type: Number,
+            default: 0
+        },
+        bestScore: {
+            type: Number,
+            default: 0
+        }
     }
 }, {
     timestamps: true        // createdAt、updatedAtを自動追加

@@ -161,29 +161,44 @@ router.post('/game/complete', optionalAuth, async (req, res) => {
         // ログインユーザーの場合、スコア更新とゲーム履歴保存
         if (req.isAuthenticated() && req.user) {
             try {
-                // ベストスコア更新
-                if (result.score > req.user.bestScore) {
-                    await User.findByIdAndUpdate(req.user._id, {
-                        bestScore: result.score
-                    });
+                // ユーザー統計更新（ソロモード）
+                const currentSoloStats = req.user.soloStats || { totalScore: 0, playCount: 0, bestScore: 0 };
+                const newSoloTotalScore = currentSoloStats.totalScore + result.score;
+                const newSoloPlayCount = currentSoloStats.playCount + 1;
+                const newSoloBestScore = Math.max(currentSoloStats.bestScore, result.score);
+
+                // ベストスコア更新判定
+                if (result.score > currentSoloStats.bestScore) {
                     result.isNewBestScore = true;
                 }
+
+                await User.findByIdAndUpdate(req.user._id, {
+                    soloStats: {
+                        totalScore: newSoloTotalScore,
+                        playCount: newSoloPlayCount,
+                        bestScore: newSoloBestScore
+                    }
+                });
 
                 // ゲーム履歴を保存
                 const gameRecord = new GameRecord({
                     userId: req.user._id,
+                    gameMode: 'solo', // 現在はソロモードのみ
                     score: result.score,
-                    distance: result.finalDistance,
-                    hintsUsed: gameSession.hintsUsed,
+                    finalDistance: result.distance,
+                    hintUsed: gameSession.hintUsed || false,
                     targetLocation: {
-                        lat: gameSession.targetLat,
-                        lng: gameSession.targetLng
+                        lat: gameSession.targetLocation?.lat || 0,
+                        lng: gameSession.targetLocation?.lng || 0
                     },
-                    playerGuess: {
+                    playerStartLocation: {
+                        lat: gameSession.initialPlayerLocation?.lat || 0,
+                        lng: gameSession.initialPlayerLocation?.lng || 0
+                    },
+                    finalLocation: {
                         lat: finalPlayerLat,
                         lng: finalPlayerLng
-                    },
-                    completedAt: new Date()
+                    }
                 });
 
                 await gameRecord.save();

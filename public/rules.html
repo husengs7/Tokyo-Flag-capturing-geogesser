@@ -148,7 +148,31 @@
         </div>
     </div>
     
-    <a href="/game" class="start-game-button">🎮 ゲームを開始する</a>
+    <a href="#" id="startGameButton" class="start-game-button">🎮 ゲームを開始する</a>
+
+    <script>
+        document.getElementById('startGameButton').addEventListener('click', async function(e) {
+            e.preventDefault();
+
+            try {
+                // ログイン状態をチェック
+                const response = await fetch('/auth/me');
+                const data = await response.json();
+
+                if (data.success && data.user) {
+                    // ログイン済み：ゲーム画面に遷移
+                    window.location.href = '/game';
+                } else {
+                    // 未ログイン：ログイン画面に遷移（戻り先を指定）
+                    window.location.href = `/login?returnUrl=${encodeURIComponent('/game')}`;
+                }
+            } catch (error) {
+                console.error('ログイン状態の確認に失敗:', error);
+                // エラー時もログイン画面に遷移
+                window.location.href = `/login?returnUrl=${encodeURIComponent('/game')}`;
+            }
+        });
+    </script>
 </body>
 
 </html>

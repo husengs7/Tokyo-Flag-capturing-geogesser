@@ -15,4 +15,12 @@ router.get('/rules', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'rules.html'));
 });
 
+router.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'online', 'views', 'online_login.html'));
+});
+
+router.get('/rooms', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'online', 'views', 'online_rooms.html'));
+});
+
 module.exports = router;

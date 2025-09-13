@@ -12,9 +12,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (battleButton) {
-        battleButton.addEventListener('click', () => {
-            console.log('BATTLE button clicked, redirecting to online login page');
-            window.location.href = '/online/views/online_login.html';
+        battleButton.addEventListener('click', async () => {
+            console.log('BATTLE button clicked, checking login status');
+
+            try {
+                // ログイン状態をチェック
+                const response = await fetch('/auth/me');
+                const data = await response.json();
+
+                if (data.success && data.user) {
+                    // ログイン済み：ルーム一覧画面に遷移
+                    window.location.href = '/rooms';
+                } else {
+                    // 未ログイン：ログイン画面に遷移（戻り先をroomsに指定）
+                    window.location.href = `/login?returnUrl=${encodeURIComponent('/rooms')}`;
+                }
+            } catch (error) {
+                console.error('ログイン状態の確認に失敗:', error);
+                // エラー時もログイン画面に遷移
+                window.location.href = `/login?returnUrl=${encodeURIComponent('/rooms')}`;
+            }
         });
     } else {
         console.error('BATTLE button not found');

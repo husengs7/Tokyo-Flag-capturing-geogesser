@@ -38,7 +38,8 @@ router.post('/register', async (req, res) => {
                 user: {
                     id: user._id,
                     username: user.username,
-                    bestScore: user.bestScore
+                    soloStats: user.soloStats || { totalScore: 0, playCount: 0, bestScore: 0 },
+                    multiStats: user.multiStats || { totalScore: 0, playCount: 0, bestScore: 0 }
                 }
             });
         });
@@ -92,7 +93,8 @@ router.post('/login', (req, res, next) => {
                 user: {
                     id: user._id,
                     username: user.username,
-                    bestScore: user.bestScore
+                    soloStats: user.soloStats || { totalScore: 0, playCount: 0, bestScore: 0 },
+                    multiStats: user.multiStats || { totalScore: 0, playCount: 0, bestScore: 0 }
                 }
             });
         });
@@ -124,7 +126,8 @@ router.get('/me', (req, res) => {
             user: {
                 id: req.user._id,
                 username: req.user.username,
-                bestScore: req.user.bestScore
+                soloStats: req.user.soloStats || { totalScore: 0, playCount: 0, bestScore: 0 },
+                multiStats: req.user.multiStats || { totalScore: 0, playCount: 0, bestScore: 0 }
             }
         });
     } else {

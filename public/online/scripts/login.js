@@ -135,22 +135,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // ログイン処理
     async function handleLogin(username, password) {
         setButtonLoading(true);
-        
+
         const result = await apiRequest('/auth/login', 'POST', {
             username: username,
             password: password
         });
-        
+
         setButtonLoading(false);
-        
+
         if (result.success) {
             showSuccess('ログインに成功しました！遷移中...');
-            
-            // 1.5秒後にルーム一覧ページに遷移
+
+            // returnUrlがあればそこに遷移、なければルーム一覧に遷移
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnUrl = urlParams.get('returnUrl');
+
             setTimeout(() => {
-                window.location.href = '/online/views/online_rooms.html';
+                if (returnUrl) {
+                    window.location.href = decodeURIComponent(returnUrl);
+                } else {
+                    window.location.href = '/online/views/online_rooms.html';
+                }
             }, 1500);
-            
+
             return true;
         } else {
             showError(result.data.message || 'ログインに失敗しました。');
@@ -197,12 +204,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (result.success) {
             showSuccess('新規ユーザーの作成に成功しました！遷移中...');
-            
-            // 1.5秒後にルーム一覧ページに遷移（登録後自動ログイン）
+
+            // returnUrlがあればそこに遷移、なければルーム一覧に遷移（登録後自動ログイン）
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnUrl = urlParams.get('returnUrl');
+
             setTimeout(() => {
-                window.location.href = '/online/views/online_rooms.html';
+                if (returnUrl) {
+                    window.location.href = decodeURIComponent(returnUrl);
+                } else {
+                    window.location.href = '/online/views/online_rooms.html';
+                }
             }, 1500);
-            
+
             return true;
         } else {
             showError(result.data.message || '新規ユーザーの作成に失敗しました。');
@@ -251,9 +265,16 @@ document.addEventListener('DOMContentLoaded', function() {
     async function checkAuthStatus() {
         const result = await apiRequest('/auth/me');
         if (result.success) {
-            // 既にログイン済みの場合はルーム一覧に遷移
+            // 既にログイン済みの場合はreturnUrlがあればそこに、なければルーム一覧に遷移
             console.log('既にログイン済み:', result.data.user);
-            window.location.href = '/online/views/online_rooms.html';
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnUrl = urlParams.get('returnUrl');
+
+            if (returnUrl) {
+                window.location.href = decodeURIComponent(returnUrl);
+            } else {
+                window.location.href = '/rooms';
+            }
         }
     }
     
