@@ -1,4 +1,4 @@
-// レスポンス形式統一化ユーティリティ
+// API レスポンス形式の統一化ユーティリティ
 
 // 成功レスポンス
 const successResponse = (res, data = null, message = 'Success', status = 200) => {

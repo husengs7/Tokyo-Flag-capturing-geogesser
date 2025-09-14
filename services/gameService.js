@@ -1,3 +1,4 @@
+// ゲームセッション管理サービス（セッション作成、検証、完了処理）
 const { calculateDistance, calculateScore } = require('../utils/gameUtils');
 
 class GameService {

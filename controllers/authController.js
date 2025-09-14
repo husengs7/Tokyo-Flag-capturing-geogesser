@@ -1,3 +1,4 @@
+// 認証関連のコントローラー（登録、ログイン、ログアウト、ユーザー情報取得）
 const passport = require('../config/passport');
 const User = require('../models/User');
 const { successResponse, errorResponse, unauthorizedResponse } = require('../utils/response');

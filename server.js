@@ -1,3 +1,4 @@
+// Express サーバーのエントリーポイント（ルーティング、ミドルウェア、静的ファイル提供）
 const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');

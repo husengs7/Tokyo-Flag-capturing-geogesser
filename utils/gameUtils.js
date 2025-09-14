@@ -1,3 +1,5 @@
+// ゲーム関連のユーティリティ関数（距離計算、スコア計算、座標検証）
+
 // 直線距離計算関数（ハバーサイン公式）
 function calculateDistance(lat1, lng1, lat2, lng2) {
     const R = 6371e3; // 地球の半径（メートル単位）

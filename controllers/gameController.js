@@ -1,3 +1,4 @@
+// ゲーム関連のコントローラー（Google Maps API、距離計算、ゲームセッション管理）
 const axios = require('axios');
 const { validateCoordinates } = require('../utils/gameUtils');
 const { successResponse, errorResponse } = require('../utils/response');

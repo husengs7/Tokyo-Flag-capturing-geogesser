@@ -1,3 +1,4 @@
+// ゲーム関連のルーティング（Google Maps API、ゲームセッション管理）
 const express = require('express');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const gameController = require('../controllers/gameController');
