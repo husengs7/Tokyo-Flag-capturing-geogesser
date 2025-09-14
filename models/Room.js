@@ -92,7 +92,7 @@ const roomSchema = new mongoose.Schema({
         type: [playerSchema],
         default: [],
         validate: {
-            validator: function(players) {
+            validator: function (players) {
                 return players.length <= 4;
             },
             message: 'ルームの最大参加者数は4人です'
@@ -133,7 +133,7 @@ const roomSchema = new mongoose.Schema({
 });
 
 // ルームキー自動生成（保存前に実行）
-roomSchema.pre('save', async function(next) {
+roomSchema.pre('save', async function (next) {
     if (this.isNew && !this.roomKey) {
         let roomKey;
         let existingRoom;
@@ -153,7 +153,7 @@ roomSchema.pre('save', async function(next) {
 });
 
 // プレイヤーをルームに追加
-roomSchema.methods.addPlayer = function(userId, username, isHost = false) {
+roomSchema.methods.addPlayer = function (userId, username, isHost = false) {
     // 既に参加しているかチェック
     const existingPlayer = this.players.find(p => p.userId.toString() === userId.toString());
     if (existingPlayer) {
@@ -177,7 +177,7 @@ roomSchema.methods.addPlayer = function(userId, username, isHost = false) {
 };
 
 // プレイヤーをルームから削除
-roomSchema.methods.removePlayer = function(userId) {
+roomSchema.methods.removePlayer = function (userId) {
     const playerIndex = this.players.findIndex(p => p.userId.toString() === userId.toString());
     if (playerIndex === -1) {
         throw new Error('プレイヤーが見つかりません');
@@ -195,17 +195,17 @@ roomSchema.methods.removePlayer = function(userId) {
 };
 
 // 全プレイヤーの準備完了チェック
-roomSchema.methods.allPlayersReady = function() {
+roomSchema.methods.allPlayersReady = function () {
     return this.players.length >= 2 && this.players.every(player => player.isReady);
 };
 
 // 全プレイヤーの推測完了チェック
-roomSchema.methods.allPlayersGuessed = function() {
+roomSchema.methods.allPlayersGuessed = function () {
     return this.players.every(player => player.hasGuessed);
 };
 
 // 現在のランキングを取得（合計スコア順）
-roomSchema.methods.getCurrentRanking = function() {
+roomSchema.methods.getCurrentRanking = function () {
     return [...this.players]
         .sort((a, b) => b.totalScore - a.totalScore)
         .map((player, index) => ({
@@ -218,7 +218,7 @@ roomSchema.methods.getCurrentRanking = function() {
 };
 
 // 次のラウンドに進む処理
-roomSchema.methods.nextRound = function() {
+roomSchema.methods.nextRound = function () {
     // 全プレイヤーの推測状態をリセット
     this.players.forEach(player => {
         player.hasGuessed = false;
@@ -237,7 +237,7 @@ roomSchema.methods.nextRound = function() {
 };
 
 // データベースインデックス設定（検索パフォーマンス向上）
-roomSchema.index({ roomKey: 1 }); // ルームキーでの検索
+// roomKey は unique: true で既にインデックス設定済み
 roomSchema.index({ hostId: 1 }); // ホストIDでの検索
 roomSchema.index({ createdAt: -1 }); // 作成日時でのソート
 roomSchema.index({ 'players.userId': 1 }); // プレイヤーIDでの検索
