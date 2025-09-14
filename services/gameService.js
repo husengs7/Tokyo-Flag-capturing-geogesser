@@ -1,4 +1,4 @@
-const { calculateDistance, calculateScore } = require('./utils');
+const { calculateDistance, calculateScore } = require('../utils/gameUtils');
 
 class GameService {
     // ゲームセッション作成
