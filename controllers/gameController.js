@@ -51,6 +51,7 @@ exports.checkStreetView = async (req, res) => {
 
         const data = response.data;
 
+
         if (data.status === 'OK') {
             successResponse(res, {
                 status: 'OK',

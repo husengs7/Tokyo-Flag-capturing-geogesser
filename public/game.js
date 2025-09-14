@@ -215,8 +215,9 @@ function startGameSession(targetPos, playerPos) {
     })
     .then(response => response.json())
     .then(data => {
-        gameId = data.gameId;
-        initialPlayerDistance = data.initialDistance;
+        const gameData = data.success ? data.data : data;
+        gameId = gameData.gameId;
+        initialPlayerDistance = gameData.initialDistance;
     })
     .catch(error => {
         console.error('ゲームセッション開始エラー:', error);
@@ -258,10 +259,11 @@ function completeGame(finalLat, finalLng) {
     })
     .then(response => response.json())
     .then(data => {
+        const resultData = data.success ? data.data : data;
         // 結果表示
         document.getElementById('result').innerHTML = `
-            距離: ${data.distance}m<br>
-            スコア: ${data.score}p
+            距離: ${resultData.distance}m<br>
+            スコア: ${resultData.score}p
         `;
 
         // GUESSボタンとHINTボタンを非表示
@@ -385,7 +387,6 @@ function setRandomLocation() {
     }
 
     if (!validLocationFound) {
-        console.log("有効な地点が見つからないため、デフォルト地点を使用");
         randomLocation = { lat: 35.676, lng: 139.692 }; // 東京駅周辺
     }
 
@@ -401,11 +402,15 @@ function setRandomLocation() {
             radius: 500  // 半径を狭めて主要道路に限定
         })
     })
-        .then(response => response.json())
+        .then(response => {
+            return response.json();
+        })
         .then(data => {
-            if (data.status === 'OK') {
+            // 新しいレスポンス形式に対応
+            const streetViewData = data.success ? data.data : data;
+            if (streetViewData.status === 'OK') {
                 // ストリートビューが存在する場合
-                targetLocation = new google.maps.LatLng(data.location.lat, data.location.lng);
+                targetLocation = new google.maps.LatLng(streetViewData.location.lat, streetViewData.location.lng);
 
                 // フラッグマーカー設置
                 if (flagMarker) flagMarker.setMap(null);
@@ -429,6 +434,7 @@ function setRandomLocation() {
 
                 // プレイヤーのスタート位置を3km圏内に設定
                 setPlayerStartPosition();
+
 
                 // ゲーム状態をリセット
                 distanceRevealed = false;
@@ -505,8 +511,9 @@ function setPlayerStartPosition() {
         })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'OK') {
-                    const playerStartPosition = new google.maps.LatLng(data.location.lat, data.location.lng);
+                const streetViewData = data.success ? data.data : data;
+                if (streetViewData.status === 'OK') {
+                    const playerStartPosition = new google.maps.LatLng(streetViewData.location.lat, streetViewData.location.lng);
                     panorama.setPosition(playerStartPosition);
                     
                     // ゲームセッション開始
@@ -652,8 +659,9 @@ function updateDistanceDisplay() {
     })
         .then(response => response.json())
         .then(data => {
+            const distanceData = data.success ? data.data : data;
             // 距離を表示
-            document.getElementById('distance-display').innerHTML = `目的地までの距離: ${data.distance}m`;
+            document.getElementById('distance-display').innerHTML = `目的地までの距離: ${distanceData.distance}m`;
 
             // 赤い円を描画（フラッグを中心とする）- 初回のみ
             if (!hintCircle) {
@@ -665,11 +673,11 @@ function updateDistanceDisplay() {
                     fillOpacity: 0.1,
                     map: map,
                     center: targetLocation,
-                    radius: data.distance
+                    radius: distanceData.distance
                 });
             } else {
                 // 円の半径を更新
-                hintCircle.setRadius(data.distance);
+                hintCircle.setRadius(distanceData.distance);
             }
         })
         .catch(error => {
