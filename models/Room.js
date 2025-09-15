@@ -79,7 +79,6 @@ const gameStateSchema = new mongoose.Schema({
 const roomSchema = new mongoose.Schema({
     roomKey: {
         type: String,
-        required: true,
         unique: true,
         length: 6 // 6桁の数字（プレイヤーが入力するルーム識別子）
     },
@@ -134,7 +133,7 @@ const roomSchema = new mongoose.Schema({
 
 // ルームキー自動生成（保存前に実行）
 roomSchema.pre('save', async function (next) {
-    if (this.isNew && !this.roomKey) {
+    if (!this.roomKey) {
         let roomKey;
         let existingRoom;
 
