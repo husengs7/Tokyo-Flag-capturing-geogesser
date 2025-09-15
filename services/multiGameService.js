@@ -107,7 +107,7 @@ class MultiGameService {
             }
 
             // プレイヤー検索
-            const player = room.players.find(p => p.userId.toString() === userId);
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
             if (!player) {
                 throw new Error('このルームに参加していません');
             }
@@ -292,8 +292,7 @@ class MultiGameService {
                 // MultiGameRecordを更新
                 const multiGameRecord = await MultiGameRecord.findOne({
                     userId: rankedPlayer.userId,
-                    roomId: roomId,
-                    isCompleted: false
+                    roomId: roomId
                 });
 
                 if (multiGameRecord) {

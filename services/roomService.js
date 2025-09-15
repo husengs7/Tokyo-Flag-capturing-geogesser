@@ -31,13 +31,14 @@ class RoomService {
                 throw new Error('既に他のルームに参加しています');
             }
 
-            // ルーム作成
+            // ルーム作成（roomKeyはpre-saveフックで自動生成）
             const room = new Room({
                 hostId: hostId,
                 settings: {
                     maxPlayers: settings.maxPlayers || 4,
                     roundCount: settings.roundCount || 3
                 }
+                // gameStateは実際のゲーム開始時に設定される
             });
 
             // ホストをプレイヤーとして追加
@@ -110,7 +111,7 @@ class RoomService {
             }
 
             // プレイヤーの存在確認
-            const player = room.players.find(p => p.userId.toString() === userId);
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
             if (!player) {
                 throw new Error('このルームに参加していません');
             }
@@ -146,7 +147,7 @@ class RoomService {
             }
 
             // プレイヤー検索
-            const player = room.players.find(p => p.userId.toString() === userId);
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
             if (!player) {
                 throw new Error('このルームに参加していません');
             }
@@ -222,7 +223,7 @@ class RoomService {
             }
 
             // プレイヤー検索
-            const player = room.players.find(p => p.userId.toString() === userId);
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
             if (!player) {
                 throw new Error('このルームに参加していません');
             }
@@ -257,7 +258,7 @@ class RoomService {
             }
 
             // プレイヤー検索
-            const player = room.players.find(p => p.userId.toString() === userId);
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
             if (!player) {
                 throw new Error('このルームに参加していません');
             }
@@ -267,6 +268,13 @@ class RoomService {
 
             // 全員が推測完了したかチェック
             if (room.allPlayersGuessed()) {
+                if (!room.gameState) {
+                    room.gameState = {
+                        targetLocation: { lat: 35.6762, lng: 139.6503 },
+                        playerStartLocation: { lat: 35.6896, lng: 139.7006 },
+                        initialDistance: 1000
+                    };
+                }
                 room.gameState.allPlayersGuessed = true;
                 room.status = 'ranking';
                 // 5秒後にランキング表示終了
