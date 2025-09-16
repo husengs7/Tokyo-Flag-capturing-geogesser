@@ -703,3 +703,25 @@ function stopHintRealTimeUpdate() {
         hintTimer = null;
     }
 }
+
+// Dark Mode Toggle Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const darkModeToggle = document.getElementById('input');
+
+    if (darkModeToggle) {
+        // 初期状態設定（チェック状態でダークモード）
+        const isChecked = darkModeToggle.checked;
+        if (isChecked) {
+            document.body.classList.add('dark-mode');
+        }
+
+        // トグルスイッチのイベントリスナー
+        darkModeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        });
+    }
+});
