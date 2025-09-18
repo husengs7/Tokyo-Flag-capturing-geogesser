@@ -25,7 +25,7 @@ body.dark-mode {
 /* ヘッダータイトル */
 h1 {
     text-align: center;
-    margin: 10px 0 20px 0;
+    margin: 5px 0 10px 0;
     font-size: 1.6em;
     color: #1a73e8;
     /* Google Blue */
@@ -58,7 +58,9 @@ h1 {
     display: flex;
     justify-content: center;
     gap: 20px;
-    margin: 10px auto;
+    margin: 5px auto;
+    height: 60px; /* ボタンエリアの高さを固定 */
+    align-items: center; /* ボタンを縦中央に配置 */
 }
 
 /* ボタンの基本スタイル */
@@ -83,6 +85,21 @@ button {
     background-color: #e55a2b;
 }
 
+/* RESPAWNボタンの特別スタイル */
+#respawn-button {
+    background-color: #28a745;
+}
+
+#respawn-button:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+#respawn-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 button:hover {
     background-color: #155ab6;
 }
@@ -93,7 +110,7 @@ button:hover {
     font-size: 1.1em;
     font-weight: bold;
     margin-top: 10px;
-    padding: 6px;
+    padding: 3px;
     height: 2.5em;
     display: flex;
     align-items: center;

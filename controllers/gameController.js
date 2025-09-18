@@ -136,6 +136,31 @@ exports.recordHint = (req, res) => {
     }
 };
 
+// リスポーン使用記録
+exports.recordRespawn = (req, res) => {
+    try {
+        const { gameId } = req.body;
+        let gameSession = req.session.gameSession;
+
+        // セッション検証
+        if (!GameService.validateGameSession(gameSession, gameId)) {
+            return errorResponse(res, '無効なゲームセッションです', 400);
+        }
+
+        // リスポーン使用を記録
+        gameSession = GameService.recordRespawnUsage(gameSession);
+        req.session.gameSession = gameSession;
+
+        successResponse(res, {
+            success: true,
+            initialPlayerLocation: gameSession.initialPlayerLocation
+        });
+    } catch (error) {
+        console.error('リスポーン記録エラー:', error);
+        errorResponse(res, 'リスポーンの記録に失敗しました', 500);
+    }
+};
+
 // ゲーム完了・スコア計算
 exports.completeGame = async (req, res) => {
     try {
@@ -187,6 +212,7 @@ exports.completeGame = async (req, res) => {
                     score: result.score,
                     finalDistance: result.distance,
                     hintUsed: gameSession.hintUsed || false,
+                    respawnCount: gameSession.respawnCount || 0,
                     targetLocation: {
                         lat: gameSession.targetLocation?.lat || 0,
                         lng: gameSession.targetLocation?.lng || 0

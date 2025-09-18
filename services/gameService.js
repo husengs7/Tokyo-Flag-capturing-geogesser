@@ -12,6 +12,7 @@ class GameService {
             initialPlayerLocation: { lat: playerLat, lng: playerLng },
             initialDistance: Math.round(initialDistance),
             hintUsed: false,
+            respawnCount: 0,
             startTime: new Date(),
             completed: false
         };
@@ -34,6 +35,14 @@ class GameService {
         return gameSession;
     }
 
+    // リスポーン使用記録
+    static recordRespawnUsage(gameSession) {
+        if (gameSession) {
+            gameSession.respawnCount = (gameSession.respawnCount || 0) + 1;
+        }
+        return gameSession;
+    }
+
     // ゲーム完了・スコア計算
     static completeGame(gameSession, finalPlayerLat, finalPlayerLng) {
         if (!gameSession) return null;
@@ -50,7 +59,7 @@ class GameService {
             gameSession.initialDistance,
             gameSession.hintUsed
         );
-        
+
         // ゲームセッション完了マーク
         gameSession.completed = true;
         gameSession.finalDistance = Math.round(finalDistance);
@@ -60,7 +69,8 @@ class GameService {
         return {
             distance: Math.round(finalDistance),
             score: score,
-            hintUsed: gameSession.hintUsed
+            hintUsed: gameSession.hintUsed,
+            respawnCount: gameSession.respawnCount || 0
         };
     }
 }

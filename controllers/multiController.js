@@ -192,6 +192,21 @@ exports.submitGuess = async (req, res) => {
     }
 };
 
+// リスポーン使用記録
+exports.recordRespawn = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+
+        const result = await MultiGameService.recordPlayerRespawn(roomId, req.user._id);
+
+        successResponse(res, result, 'リスポーン使用を記録しました');
+
+    } catch (error) {
+        console.error('リスポーン記録エラー:', error);
+        errorResponse(res, error.message, 400);
+    }
+};
+
 // 次ラウンド開始
 exports.nextRound = async (req, res) => {
     try {
