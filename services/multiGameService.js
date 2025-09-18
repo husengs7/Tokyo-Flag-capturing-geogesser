@@ -143,6 +143,7 @@ class MultiGameService {
                 score: score,
                 finalDistance: Math.round(finalDistance),
                 hintUsed: hintUsed,
+                respawnCount: player.respawnCount || 0,
                 targetLocation: {
                     lat: room.gameState.targetLocation.lat,
                     lng: room.gameState.targetLocation.lng
@@ -413,6 +414,53 @@ class MultiGameService {
             };
         } catch (error) {
             console.error('マルチゲーム統計取得エラー:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * プレイヤーのリスポーン使用を記録
+     * @param {string} roomId - ルームID
+     * @param {string} userId - プレイヤーのユーザーID
+     * @returns {Promise<Object>} 処理結果
+     */
+    static async recordPlayerRespawn(roomId, userId) {
+        try {
+            const room = await Room.findById(roomId);
+            if (!room) {
+                throw new Error('ルームが見つかりません');
+            }
+
+            // プレイヤー検索
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
+            if (!player) {
+                throw new Error('このルームに参加していません');
+            }
+
+            // ゲーム中かチェック
+            if (room.status !== 'playing') {
+                throw new Error('ゲーム中ではありません');
+            }
+
+            // 既に推測済みかチェック
+            if (player.hasGuessed) {
+                throw new Error('既に推測済みです');
+            }
+
+            // リスポーン回数を増加
+            player.respawnCount = (player.respawnCount || 0) + 1;
+
+            // ルーム保存
+            await room.save();
+
+            return {
+                success: true,
+                respawnCount: player.respawnCount,
+                gameState: room.gameState
+            };
+
+        } catch (error) {
+            console.error('リスポーン記録エラー:', error);
             throw error;
         }
     }

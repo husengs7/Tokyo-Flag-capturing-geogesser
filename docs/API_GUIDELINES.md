@@ -396,6 +396,122 @@ grep -A 5 -B 5 "room === null" controllers/multiController.js
 
 ---
 
+## 🔄 **RESPAWN機能の実装仕様**
+
+### ソロプレイとマルチプレイのRESPAWN管理方法の違い
+
+**⚠️ 重要：** ソロプレイとマルチプレイでRESPAWN機能の管理方法が異なります。
+
+#### 🎮 **ソロプレイの場合**
+
+**状態管理：** フロントエンド（session）+ バックエンド（session）
+
+```javascript
+// フロントエンド: game.js
+let respawnCount = 0;  // フロントエンドで管理
+
+// RESPAWNボタン押下時
+function respawnPlayer() {
+    respawnCount++;
+    recordRespawnUsage();  // サーバーに記録
+}
+
+// API呼び出し
+POST /api/game/respawn
+Body: { gameId: gameId }
+
+// GUESS送信時に含める
+POST /api/game/complete
+Body: { ..., respawnCount: respawnCount }
+```
+
+**データフロー：**
+
+```markdown
+Frontend respawnCount → Session gameSession → GameRecord
+```
+
+#### 🎯 **マルチプレイの場合**
+
+**状態管理：** Room（リアルタイム） → GameRecord（永続化）
+
+```javascript
+// RESPAWNボタン押下時
+POST /multi/rooms/:roomId/respawn
+→ Room.players[x].respawnCount++
+
+// GUESS送信時は自動でRoom値を使用
+POST /multi/rooms/:roomId/guess
+Body: { guessLat, guessLng, hintUsed }
+→ GameRecord.respawnCount = room.player.respawnCount
+```
+
+**データフロー：**
+
+```markdown
+RESPAWN押下 → Room.player.respawnCount++
+     ↓
+GUESS送信 → GameRecord.respawnCount = Room値
+     ↓
+次ラウンド → Room.player.respawnCount = 0
+```
+
+#### 📊 **実装上の重要な違い**
+
+| 項目 | ソロプレイ | マルチプレイ |
+|------|-----------|-------------|
+| **状態管理場所** | フロントエンド + Session | Room モデル |
+| **API設計** | `/api/game/respawn` | `/multi/rooms/:roomId/respawn` |
+| **データ送信** | GUESS時にcountを送信 | Roomから自動取得 |
+| **リセット** | 新ゲーム開始時 | ラウンド切り替え時 |
+| **セキュリティ** | クライアント改ざん可能 | サーバー側管理のみ |
+| **リアルタイム性** | なし | 他プレイヤーに同期可能 |
+
+#### 🔧 **実装時の注意点**
+
+1. **API エンドポイントの使い分け**
+
+   ```javascript
+   // ソロプレイ
+   POST /api/game/respawn
+
+   // マルチプレイ
+   POST /multi/rooms/:roomId/respawn
+   ```
+
+2. **データフローの理解**
+   - **ソロ**: フロントエンド主導
+   - **マルチ**: サーバー（Room）主導
+
+3. **フロントエンド実装での考慮**
+
+   ```javascript
+   // ソロプレイ実装例
+   if (gameMode === 'solo') {
+       await fetch('/api/game/respawn', {
+           body: JSON.stringify({ gameId })
+       });
+       respawnCount++; // フロントエンドで管理
+   }
+
+   // マルチプレイ実装例
+   if (gameMode === 'multi') {
+       await fetch(`/multi/rooms/${roomId}/respawn`);
+       // サーバー側で自動管理、フロントエンドでのcount不要
+   }
+   ```
+
+#### ✅ **検証済み実装パターン**
+
+以下のパターンは既存コードベースとの一貫性が確認済みです：
+
+- **エンドポイント命名**: `/game/hint` → `/game/respawn`
+- **プロパティ命名**: `hasGuessed` → `respawnCount`
+- **データ型**: `Number` with `default: 0, min: 0`
+- **Controller構造**: 既存の簡潔なパターンに準拠
+
+---
+
 **このガイドラインを厳格に遵守することで、バックエンドとの完全な互換性を保証し、統合時のトラブルを回避できます。**
 
 **実装の各段階で必ず検証作業を行い、不明な点があれば即座に実装を停止してバックエンド実装を再確認してください。**
