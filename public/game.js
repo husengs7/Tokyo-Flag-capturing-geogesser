@@ -17,6 +17,9 @@ let gameId = null; // ゲームセッションID
 let hintUpdateInterval = null;
 let hintTimer = null;
 let hintCircle = null; // HINT専用の円を管理
+let hintTimeLeft = 10; // HINT機能の残り時間
+let hintCountdownInterval = null; // カウントダウン用インターバル
+let countdownElement = null; // カウントダウン数字表示要素
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
@@ -651,6 +654,10 @@ function revealDistance() {
     // 距離表示要素を表示状態にして、初回の距離計算とリアルタイム更新開始
     document.getElementById('distance-display').style.visibility = 'visible';
     
+    // HINT機能のカウントダウンを開始
+    hintTimeLeft = 10;
+    startHintCountdown();
+    
     // 既存の円があれば色を元に戻す
     if (hintCircle) {
         hintCircle.setOptions({
@@ -746,6 +753,132 @@ function stopHintRealTimeUpdate() {
     if (hintTimer) {
         clearTimeout(hintTimer);
         hintTimer = null;
+    }
+    if (hintCountdownInterval) {
+        clearInterval(hintCountdownInterval);
+        hintCountdownInterval = null;
+    }
+    // カウントダウン数字を削除
+    if (countdownElement) {
+        countdownElement.remove();
+        countdownElement = null;
+    }
+    // 円の点滅を停止
+    if (hintCircle) {
+        hintCircle.setOptions({
+            strokeOpacity: 0.8 // 通常の透明度に戻す
+        });
+    }
+}
+
+// HINT機能のカウントダウン開始
+function startHintCountdown() {
+    hintCountdownInterval = setInterval(() => {
+        hintTimeLeft--;
+        
+        // 残り3秒で円を点滅させる
+        if (hintTimeLeft === 3) {
+            startCircleBlinking();
+        }
+        
+        // 残り3秒以下で数字カウントダウンを表示
+        if (hintTimeLeft <= 3 && hintTimeLeft > 0) {
+            showCountdownNumber(hintTimeLeft);
+        }
+        
+        // 時間切れでHINT機能を停止
+        if (hintTimeLeft <= 0) {
+            stopHintRealTimeUpdate();
+            // HINTボタンを無効化
+            const hintButton = document.getElementById('reveal-distance-button');
+            hintButton.disabled = true;
+            hintButton.style.opacity = '0.5';
+            document.getElementById('distance-display').innerHTML = '';
+            if (hintCircle) {
+                hintCircle.setMap(null);
+                hintCircle = null;
+            }
+        }
+    }, 1000);
+}
+
+
+// 円の点滅を開始
+function startCircleBlinking() {
+    if (hintCircle) {
+        // 点滅アニメーションを追加
+        let blinkState = true;
+        const blinkInterval = setInterval(() => {
+            if (hintTimeLeft <= 0) {
+                clearInterval(blinkInterval);
+                return;
+            }
+            
+            if (blinkState) {
+                hintCircle.setOptions({
+                    strokeOpacity: 0.2
+                });
+            } else {
+                hintCircle.setOptions({
+                    strokeOpacity: 0.8
+                });
+            }
+            blinkState = !blinkState;
+        }, 500); // 0.5秒間隔で点滅
+    }
+}
+
+// 円の中心にカウントダウン数字を表示
+function showCountdownNumber(number) {
+    // 既存のカウントダウン要素を削除
+    if (countdownElement) {
+        countdownElement.remove();
+    }
+    
+    if (hintCircle) {
+        // 円の中心座標を取得
+        const center = hintCircle.getCenter();
+        
+        // 地図上の座標を画面上の座標に変換
+        const projection = map.getProjection();
+        const overlay = new google.maps.OverlayView();
+        
+        overlay.onAdd = function() {
+            // カウントダウン数字要素を作成
+            countdownElement = document.createElement('div');
+            countdownElement.className = 'hint-countdown-overlay';
+            countdownElement.textContent = number;
+            
+            // オーバーレイに追加
+            const panes = this.getPanes();
+            panes.overlayLayer.appendChild(countdownElement);
+        };
+        
+        overlay.draw = function() {
+            const overlayProjection = this.getProjection();
+            const pos = overlayProjection.fromLatLngToDivPixel(center);
+            
+            if (countdownElement) {
+                countdownElement.style.left = (pos.x - 30) + 'px';  // 中央揃え調整
+                countdownElement.style.top = (pos.y - 40) + 'px';   // 中央揃え調整
+            }
+        };
+        
+        overlay.onRemove = function() {
+            if (countdownElement) {
+                countdownElement.parentNode.removeChild(countdownElement);
+                countdownElement = null;
+            }
+        };
+        
+        overlay.setMap(map);
+        
+        // 1秒後に削除（次の数字表示の準備）
+        setTimeout(() => {
+            if (overlay) {
+                overlay.setMap(null);
+            }
+        }, 1000);
     }
 }
 

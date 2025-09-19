@@ -142,6 +142,58 @@ body.dark-mode #distance-display {
     color: white;
 }
 
+/* HINT機能の残り時間警告 */
+.hint-warning {
+    color: #ff0000;
+    font-weight: bold;
+    margin-top: 5px;
+    animation: warning-pulse 1s ease-in-out infinite;
+}
+
+@keyframes warning-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+/* 赤い縁の点滅アニメーション */
+.circle-blink {
+    animation: circle-blink 0.5s ease-in-out infinite;
+}
+
+@keyframes circle-blink {
+    0% { stroke-opacity: 0.8; }
+    50% { stroke-opacity: 0.2; }
+    100% { stroke-opacity: 0.8; }
+}
+
+/* HINT円の中心カウントダウン表示 */
+.hint-countdown-overlay {
+    position: absolute;
+    font-size: 4em;
+    font-weight: bold;
+    color: #ff0000;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(255,0,0,0.8);
+    z-index: 1001;
+    pointer-events: none;
+    animation: countdown-pulse 0.8s ease-in-out;
+}
+
+@keyframes countdown-pulse {
+    0% { 
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% { 
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
 /* Dark Mode Toggle Switch Styles - positioned in top-right */
 .switch {
   position: absolute;
