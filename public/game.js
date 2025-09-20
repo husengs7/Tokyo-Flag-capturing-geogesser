@@ -9,12 +9,17 @@ let connectionLine;
 let distanceCircle;
 let distanceRevealed = false;
 let hintUsed = false;
+let respawnCount = 0;
+let initialPlayerLocation = null; // 初期プレイヤー位置
 let retryCount = 0;
 let initialPlayerDistance = 0; // 初期位置とフラッグの距離
 let gameId = null; // ゲームセッションID
 let hintUpdateInterval = null;
 let hintTimer = null;
 let hintCircle = null; // HINT専用の円を管理
+let hintTimeLeft = 10; // HINT機能の残り時間
+let hintCountdownInterval = null; // カウントダウン用インターバル
+let countdownElement = null; // カウントダウン数字表示要素
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
@@ -201,6 +206,12 @@ const generateWeightedRandomLocation = () => {
 
 // ゲームセッション開始
 function startGameSession(targetPos, playerPos) {
+    // 初期プレイヤー位置を記録
+    initialPlayerLocation = {
+        lat: playerPos.lat(),
+        lng: playerPos.lng()
+    };
+
     fetch('/api/game/start', {
         method: 'POST',
         headers: {
@@ -266,9 +277,10 @@ function completeGame(finalLat, finalLng) {
             スコア: ${resultData.score}p
         `;
 
-        // GUESSボタンとHINTボタンを非表示
+        // GUESSボタン、HINTボタン、RESPAWNボタンを非表示
         document.getElementById('guess-button').style.display = 'none';
         document.getElementById('reveal-distance-button').style.display = 'none';
+        document.getElementById('respawn-button').style.display = 'none';
         
         // HINT機能のタイマーをクリア
         stopHintRealTimeUpdate();
@@ -284,9 +296,10 @@ function completeGame(finalLat, finalLng) {
         console.error('ゲーム完了エラー:', error);
         document.getElementById('result').innerHTML = 'ゲーム完了エラー';
 
-        // エラー時でもGUESSボタンとHINTボタンを非表示
+        // エラー時でもGUESSボタン、HINTボタン、RESPAWNボタンを非表示
         document.getElementById('guess-button').style.display = 'none';
         document.getElementById('reveal-distance-button').style.display = 'none';
+        document.getElementById('respawn-button').style.display = 'none';
         
         // HINT機能のタイマーをクリア
         stopHintRealTimeUpdate();
@@ -337,7 +350,10 @@ function initMap() {
 
     // HINTボタンイベント
     document.getElementById('reveal-distance-button').addEventListener('click', revealDistance);
-    
+
+    // RESPAWNボタンイベント
+    document.getElementById('respawn-button').addEventListener('click', respawnPlayer);
+
     // RESTARTボタンイベント
     document.getElementById('restart-button').addEventListener('click', () => {
         window.location.href = '/game';
@@ -439,6 +455,8 @@ function setRandomLocation() {
                 // ゲーム状態をリセット
                 distanceRevealed = false;
                 hintUsed = false;
+                respawnCount = 0;
+                initialPlayerLocation = null;
                 initialPlayerDistance = 0;
                 
                 // HINT機能のタイマーをクリア
@@ -446,7 +464,18 @@ function setRandomLocation() {
                 
                 document.getElementById('guess-button').style.display = 'inline-block';
                 document.getElementById('reveal-distance-button').style.display = 'inline-block';
+                document.getElementById('respawn-button').style.display = 'inline-block';
                 document.getElementById('restart-button').style.display = 'none';
+
+                // RESPAWNボタンの状態をリセット
+                const respawnButton = document.getElementById('respawn-button');
+                respawnButton.disabled = false;
+                respawnButton.style.opacity = '1';
+
+                // HINTボタンの状態もリセット
+                const hintButton = document.getElementById('reveal-distance-button');
+                hintButton.disabled = false;
+                hintButton.style.opacity = '1';
                 document.getElementById('distance-display').innerHTML = '';
                 document.getElementById('distance-display').style.visibility = 'visible';
                 document.getElementById('result').innerHTML = '';
@@ -582,8 +611,27 @@ function makeGuess() {
     map.fitBounds(bounds);
     map.setZoom(Math.min(map.getZoom(), 15));
 
+    // HINT機能の距離表示をクリア（RESPAWN後でも確実に消去）
+    document.getElementById('distance-display').innerHTML = '';
+    document.getElementById('distance-display').style.visibility = 'hidden';
+
+    // HINT機能のリアルタイム更新を停止
+    stopHintRealTimeUpdate();
+
     // ゲーム完了・スコア計算
     completeGame(currentPos.lat(), currentPos.lng());
+
+    // GUESSボタン押下後、3つのボタンを同時に非表示
+    const guessButton = document.getElementById('guess-button');
+    const hintButton = document.getElementById('reveal-distance-button');
+    const respawnButton = document.getElementById('respawn-button');
+
+    // DOM更新をバッチで実行（3つのボタンを完全に同時に消去）
+    requestAnimationFrame(() => {
+        guessButton.style.display = 'none';
+        hintButton.style.display = 'none';
+        respawnButton.style.display = 'none';
+    });
 
 }
 
@@ -605,6 +653,10 @@ function revealDistance() {
 
     // 距離表示要素を表示状態にして、初回の距離計算とリアルタイム更新開始
     document.getElementById('distance-display').style.visibility = 'visible';
+    
+    // HINT機能のカウントダウンを開始
+    hintTimeLeft = 10;
+    startHintCountdown();
     
     // 既存の円があれば色を元に戻す
     if (hintCircle) {
@@ -702,6 +754,199 @@ function stopHintRealTimeUpdate() {
         clearTimeout(hintTimer);
         hintTimer = null;
     }
+    if (hintCountdownInterval) {
+        clearInterval(hintCountdownInterval);
+        hintCountdownInterval = null;
+    }
+    // カウントダウン数字を削除
+    if (countdownElement) {
+        countdownElement.remove();
+        countdownElement = null;
+    }
+    // 円の点滅を停止
+    if (hintCircle) {
+        hintCircle.setOptions({
+            strokeOpacity: 0.8 // 通常の透明度に戻す
+        });
+    }
+}
+
+// HINT機能のカウントダウン開始
+function startHintCountdown() {
+    hintCountdownInterval = setInterval(() => {
+        hintTimeLeft--;
+        
+        // 残り3秒で円を点滅させる
+        if (hintTimeLeft === 3) {
+            startCircleBlinking();
+        }
+        
+        // 残り3秒以下で数字カウントダウンを表示
+        if (hintTimeLeft <= 3 && hintTimeLeft > 0) {
+            showCountdownNumber(hintTimeLeft);
+        }
+        
+        // 時間切れでHINT機能を停止
+        if (hintTimeLeft <= 0) {
+            stopHintRealTimeUpdate();
+            // HINTボタンを無効化
+            const hintButton = document.getElementById('reveal-distance-button');
+            hintButton.disabled = true;
+            hintButton.style.opacity = '0.5';
+            document.getElementById('distance-display').innerHTML = '';
+            if (hintCircle) {
+                hintCircle.setMap(null);
+                hintCircle = null;
+            }
+        }
+    }, 1000);
+}
+
+
+// 円の点滅を開始
+function startCircleBlinking() {
+    if (hintCircle) {
+        // 点滅アニメーションを追加
+        let blinkState = true;
+        const blinkInterval = setInterval(() => {
+            if (hintTimeLeft <= 0) {
+                clearInterval(blinkInterval);
+                return;
+            }
+            
+            if (blinkState) {
+                hintCircle.setOptions({
+                    strokeOpacity: 0.2
+                });
+            } else {
+                hintCircle.setOptions({
+                    strokeOpacity: 0.8
+                });
+            }
+            blinkState = !blinkState;
+        }, 500); // 0.5秒間隔で点滅
+    }
+}
+
+// 円の中心にカウントダウン数字を表示
+function showCountdownNumber(number) {
+    // 既存のカウントダウン要素を削除
+    if (countdownElement) {
+        countdownElement.remove();
+    }
+    
+    if (hintCircle) {
+        // 円の中心座標を取得
+        const center = hintCircle.getCenter();
+        
+        // 地図上の座標を画面上の座標に変換
+        const projection = map.getProjection();
+        const overlay = new google.maps.OverlayView();
+        
+        overlay.onAdd = function() {
+            // カウントダウン数字要素を作成
+            countdownElement = document.createElement('div');
+            countdownElement.className = 'hint-countdown-overlay';
+            countdownElement.textContent = number;
+            
+            // オーバーレイに追加
+            const panes = this.getPanes();
+            panes.overlayLayer.appendChild(countdownElement);
+        };
+        
+        overlay.draw = function() {
+            const overlayProjection = this.getProjection();
+            const pos = overlayProjection.fromLatLngToDivPixel(center);
+            
+            if (countdownElement) {
+                countdownElement.style.left = (pos.x - 30) + 'px';  // 中央揃え調整
+                countdownElement.style.top = (pos.y - 40) + 'px';   // 中央揃え調整
+            }
+        };
+        
+        overlay.onRemove = function() {
+            if (countdownElement) {
+                countdownElement.parentNode.removeChild(countdownElement);
+                countdownElement = null;
+            }
+        };
+        
+        overlay.setMap(map);
+        
+        // 1秒後に削除（次の数字表示の準備）
+        setTimeout(() => {
+            if (overlay) {
+                overlay.setMap(null);
+            }
+        }, 1000);
+    }
+}
+
+// RESPAWN機能
+function respawnPlayer() {
+    // 既に1回使用済みかチェック（将来的に複数回対応のため数値で管理）
+    if (respawnCount >= 1) {
+        return;
+    }
+
+    if (!gameId || !initialPlayerLocation) {
+        console.error('ゲームセッションまたは初期位置が無効です');
+        return;
+    }
+
+    // RESPAWN使用回数を増やす
+    respawnCount++;
+
+    // RESPAWN使用をサーバーに記録
+    recordRespawnUsage();
+
+    // 初期位置にプレイヤーを戻す
+    const startPos = new google.maps.LatLng(
+        initialPlayerLocation.lat,
+        initialPlayerLocation.lng
+    );
+    panorama.setPosition(startPos);
+
+    // 既存のプレイヤーマーカーと接続線を削除
+    if (playerMarker) {
+        playerMarker.setMap(null);
+        playerMarker = null;
+    }
+    if (connectionLine) {
+        connectionLine.setMap(null);
+        connectionLine = null;
+    }
+
+    // ボタンを無効化
+    const button = document.getElementById('respawn-button');
+    button.disabled = true;
+    button.style.opacity = '0.5';
+}
+
+// RESPAWN使用記録
+function recordRespawnUsage() {
+    if (!gameId) return;
+
+    fetch('/api/game/respawn', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            gameId: gameId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('リスポーン使用を記録しました');
+        } else {
+            console.error('リスポーン記録エラー:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('リスポーン記録リクエストエラー:', error);
+    });
 }
 
 // Dark Mode Toggle Functionality

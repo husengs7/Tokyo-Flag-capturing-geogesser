@@ -20,6 +20,9 @@ router.post('/game/start', gameController.startGame);
 // ヒント使用記録
 router.post('/game/hint', gameController.recordHint);
 
+// リスポーン使用記録
+router.post('/game/respawn', gameController.recordRespawn);
+
 // ゲーム完了・スコア計算
 router.post('/game/complete', optionalAuth, gameController.completeGame);
 

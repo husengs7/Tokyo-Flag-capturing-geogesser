@@ -37,6 +37,10 @@ const playerSchema = new mongoose.Schema({
         type: Boolean,
         default: false // 現在のラウンドで推測済みかどうか
     },
+    respawnCount: {
+        type: Number,
+        default: 0 // 現在のラウンドでのリスポーン使用回数
+    },
     socketId: {
         type: String,
         default: null // WebSocket接続ID（リアルタイム通信用）
@@ -221,6 +225,7 @@ roomSchema.methods.nextRound = function () {
     // 全プレイヤーの推測状態をリセット
     this.players.forEach(player => {
         player.hasGuessed = false;
+        player.respawnCount = 0; // リスポーン回数もリセット
     });
 
     this.gameState.currentRound++;

@@ -48,6 +48,12 @@ const gameRecordSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    // リスポーン使用回数
+    respawnCount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
 }, {
     timestamps: true  // createdAt、updatedAtを自動追加
 });
