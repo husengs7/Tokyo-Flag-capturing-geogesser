@@ -20,6 +20,9 @@ let hintCircle = null; // HINT専用の円を管理
 let hintTimeLeft = 10; // HINT機能の残り時間
 let hintCountdownInterval = null; // カウントダウン用インターバル
 let countdownElement = null; // カウントダウン数字表示要素
+let memoMarkers = []; // メモマーカーの配列
+let memoMode = false; // メモ設置モードの状態
+let longPressTimer = null; // 長押し検出用タイマー
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
@@ -364,6 +367,9 @@ function initMap() {
         window.location.href = '/';
     });
 
+    // メモ機能の初期化
+    initializeMemoFunction();
+
     // ゲーム開始
     setRandomLocation();
 }
@@ -458,6 +464,9 @@ function setRandomLocation() {
                 respawnCount = 0;
                 initialPlayerLocation = null;
                 initialPlayerDistance = 0;
+
+                // メモ機能もリセット
+                resetMemoFunction();
                 
                 // HINT機能のタイマーをクリア
                 stopHintRealTimeUpdate();
@@ -840,7 +849,6 @@ function showCountdownNumber(number) {
         const center = hintCircle.getCenter();
         
         // 地図上の座標を画面上の座標に変換
-        const projection = map.getProjection();
         const overlay = new google.maps.OverlayView();
         
         overlay.onAdd = function() {
@@ -947,6 +955,154 @@ function recordRespawnUsage() {
     .catch(error => {
         console.error('リスポーン記録リクエストエラー:', error);
     });
+}
+
+// メモ機能の初期化
+function initializeMemoFunction() {
+    const memoEyeBox = document.getElementById('memo-box-left');
+    const memoTrashBox = document.getElementById('memo-box-right');
+
+    if (!memoEyeBox || !memoTrashBox) return;
+
+    // 目のアイコンボックスからのドラッグ機能
+    setupMemoBoxDrag(memoEyeBox);
+
+    // ゴミ箱アイコンクリックでメモ削除
+    memoTrashBox.addEventListener('click', clearAllMemoMarkers);
+
+    // マップクリックイベントの設定
+    setupMapClickEvents();
+}
+
+// メモボックスのドラッグ機能設定
+function setupMemoBoxDrag(memoEyeBox) {
+    let isDragging = false;
+    let dragStartX, dragStartY;
+
+    memoEyeBox.addEventListener('mousedown', function(e) {
+        if (memoMarkers.length >= 1) return; // 既にメモがある場合は設置不可
+
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        memoEyeBox.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+
+        // ドラッグ中の視覚効果
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+            memoEyeBox.style.opacity = '0.7';
+        }
+    });
+
+    document.addEventListener('mouseup', function(e) {
+        if (!isDragging) return;
+
+        isDragging = false;
+        memoEyeBox.style.cursor = 'pointer';
+        memoEyeBox.style.opacity = '1';
+
+        // マップ上にドロップされた場合、その位置にメモを設置
+        const mapElement = document.getElementById('map');
+        if (mapElement) {
+            const mapRect = mapElement.getBoundingClientRect();
+
+            if (e.clientX >= mapRect.left && e.clientX <= mapRect.right &&
+                e.clientY >= mapRect.top && e.clientY <= mapRect.bottom) {
+
+                // マップ座標に変換してメモを設置
+                const bounds = map.getBounds();
+                if (bounds) {
+                    const ne = bounds.getNorthEast();
+                    const sw = bounds.getSouthWest();
+
+                    const lng = sw.lng() + (ne.lng() - sw.lng()) * ((e.clientX - mapRect.left) / mapRect.width);
+                    const lat = ne.lat() - (ne.lat() - sw.lat()) * ((e.clientY - mapRect.top) / mapRect.height);
+
+                    placeMemoMarker(new google.maps.LatLng(lat, lng));
+                }
+            }
+        }
+    });
+}
+
+// マップクリックイベントの設定
+function setupMapClickEvents() {
+    if (!map) return;
+
+    // 既存のクリックイベントは削除（ドラッグのみで設置）
+}
+
+// メモマーカーを設置
+function placeMemoMarker(position) {
+    if (!position || memoMarkers.length >= 1) return; // 1つまでの制限
+
+    // 既存のメモマーカーがあれば削除
+    clearAllMemoMarkers();
+
+    // 目の絵文字マーカーを作成
+    const marker = new google.maps.Marker({
+        position: position,
+        map: map,
+        icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+                <polygon points="4,4 4,28 6,28 6,18 26,14 6,10 6,4" fill="lightblue" stroke="black" stroke-width="1"/>
+            </svg>
+        `),
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(6, 16)
+        },
+        title: 'メモマーカー（ドラッグで移動可能）',
+        draggable: true,
+        zIndex: 1000
+    });
+
+    // マーカーのドラッグ機能を設定
+    setupMarkerDrag(marker);
+
+    // マーカー配列に追加
+    memoMarkers.push(marker);
+}
+
+// メモマーカーを削除
+function removeMemoMarker(marker) {
+    // マップから削除
+    marker.setMap(null);
+
+    // 配列から削除
+    const index = memoMarkers.indexOf(marker);
+    if (index > -1) {
+        memoMarkers.splice(index, 1);
+    }
+}
+
+// 全メモマーカーをクリア
+function clearAllMemoMarkers() {
+    memoMarkers.forEach(marker => {
+        marker.setMap(null);
+    });
+    memoMarkers = [];
+}
+
+// マーカーのドラッグ機能設定
+function setupMarkerDrag(marker) {
+    marker.addListener('dragend', function(event) {
+        // ドラッグ終了時の処理（必要に応じて追加）
+        console.log('メモマーカーが移動されました:', event.latLng.toString());
+    });
+}
+
+// ゲームリセット時にメモマーカーもクリア
+function resetMemoFunction() {
+    clearAllMemoMarkers();
+    memoMode = false;
 }
 
 // Dark Mode Toggle Functionality

@@ -37,6 +37,7 @@ h1 {
     flex-grow: 1;
     /* 残りの高さいっぱいに広がる */
     width: 100%;
+    position: relative; /* メモ機能の位置基準 */
 }
 
 /* ストリートビューとマップの共通スタイル */
@@ -46,6 +47,7 @@ h1 {
     /* 2つの要素でスペースを均等に分割 */
     height: 100%;
     box-sizing: border-box;
+    position: relative;
 }
 
 /* 中央の境界線（任意） */
@@ -478,4 +480,129 @@ body.dark-mode #distance-display {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* メモ機能のスタイル */
+#memo-controls {
+    position: absolute;
+    bottom: 15px;
+    right: 15px; /* マップ部分の右下に配置 */
+    display: flex;
+    gap: 8px;
+    z-index: 1500; /* Googleマップより前面に表示 */
+    pointer-events: auto; /* クリックイベントを確実に受け取る */
+    transform: translateX(-50%); /* マップエリア内に確実に配置 */
+}
+
+.memo-box {
+    width: 40px;
+    height: 40px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(5px); /* ガラス効果 */
+}
+
+.memo-box:hover {
+    background-color: #f0f0f0;
+    border-color: #1a73e8;
+    transform: scale(1.05);
+}
+
+.memo-eye-box {
+    background-color: rgba(26, 115, 232, 0.1);
+    border-color: #1a73e8;
+}
+
+.memo-eye-box:hover {
+    background-color: rgba(26, 115, 232, 0.2);
+}
+
+.memo-eye-box.active {
+    background-color: #1a73e8;
+    border-color: #155ab6;
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(26, 115, 232, 0.5);
+}
+
+#memo-eye-icon {
+    width: 22px;
+    height: 22px;
+    color: #1a73e8;
+    transition: color 0.2s ease;
+}
+
+.memo-eye-box.active #memo-eye-icon {
+    color: white;
+}
+
+/* ダークモード対応 */
+body.dark-mode .memo-box {
+    background-color: rgba(50, 50, 50, 0.9);
+    border-color: #555;
+}
+
+body.dark-mode .memo-box:hover {
+    background-color: rgba(70, 70, 70, 0.9);
+    border-color: #1a73e8;
+}
+
+body.dark-mode .memo-eye-box {
+    background-color: rgba(26, 115, 232, 0.2);
+    border-color: #1a73e8;
+}
+
+/* メモマーカーのスタイル */
+.memo-marker {
+    width: 12px;
+    height: 12px;
+    background-color: #ff6b35;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+}
+
+.memo-marker:hover {
+    background-color: #e55a2b;
+    transform: scale(1.2);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.memo-trash-box {
+    background-color: rgba(255, 107, 53, 0.1);
+    border-color: #ff6b35;
+}
+
+.memo-trash-box:hover {
+    background-color: rgba(255, 107, 53, 0.2);
+    border-color: #e55a2b;
+    transform: scale(1.05);
+}
+
+#memo-trash-icon {
+    width: 22px;
+    height: 22px;
+    color: #ff6b35;
+    transition: color 0.2s ease;
+}
+
+.memo-trash-box:hover #memo-trash-icon {
+    color: #e55a2b;
+}
+
+body.dark-mode .memo-trash-box {
+    background-color: rgba(255, 107, 53, 0.2);
+    border-color: #ff6b35;
+}
+
+body.dark-mode .memo-trash-box:hover {
+    background-color: rgba(255, 107, 53, 0.3);
+    border-color: #e55a2b;
 }
