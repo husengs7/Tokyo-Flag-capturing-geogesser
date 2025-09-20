@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 認証ボタンのクリックハンドラー
     async function handleAuthButtonClick() {
         if (authButton.classList.contains('login-btn')) {
-            window.location.href = '/login';
+            window.location.href = `/login?returnUrl=${encodeURIComponent('/')}`;
         } else if (authButton.classList.contains('logout-btn')) {
             await logout();
         }
