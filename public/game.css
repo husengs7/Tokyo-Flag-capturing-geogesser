@@ -172,7 +172,7 @@ body.dark-mode #distance-display {
 /* HINT円の中心カウントダウン表示 */
 .hint-countdown-overlay {
     position: absolute;
-    font-size: 4em;
+    font-size: 8em;
     font-weight: bold;
     color: #ff0000;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(255,0,0,0.8);
@@ -606,3 +606,4 @@ body.dark-mode .memo-trash-box:hover {
     background-color: rgba(255, 107, 53, 0.3);
     border-color: #e55a2b;
 }
+

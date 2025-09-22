@@ -26,6 +26,168 @@ let longPressTimer = null; // 長押し検出用タイマー
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3; // スコア計算の定数c
 
+
+// 外部ライブラリ Canvas Confetti を使った演出
+function triggerCelebration(score) {
+    // Canvas Confetti ライブラリを使用
+    if (typeof confetti !== 'undefined') {
+        
+        // スコアに応じて演出レベルを決定
+        if (score >= 400) {
+            // 超高スコア: 豪華な花火演出
+            confetti({
+                particleCount: 200,
+                spread: 120,
+                startVelocity: 45,
+                origin: { y: 0.6 },
+                colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+            });
+            // 連続花火
+            setTimeout(() => {
+                confetti({
+                    particleCount: 150,
+                    spread: 90,
+                    startVelocity: 35,
+                    origin: { x: 0.2, y: 0.7 }
+                });
+            }, 500);
+            setTimeout(() => {
+                confetti({
+                    particleCount: 150,
+                    spread: 90,
+                    startVelocity: 35,
+                    origin: { x: 0.8, y: 0.7 }
+                });
+            }, 1000);
+        } else if (score >= 300) {
+            // 高スコア: 連続演出
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                startVelocity: 40,
+                origin: { y: 0.6 }
+            });
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    spread: 80,
+                    startVelocity: 30,
+                    origin: { y: 0.7 }
+                });
+            }, 500);
+        } else if (score >= 200) {
+            // 中高スコア: 標準演出
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                startVelocity: 30,
+                origin: { y: 0.6 }
+            });
+        } else if (score >= 100) {
+            // 中スコア: 控えめ演出
+            confetti({
+                particleCount: 75,
+                spread: 60,
+                startVelocity: 25,
+                origin: { y: 0.6 }
+            });
+        } else {
+            // 低スコア: 最小演出
+            confetti({
+                particleCount: 50,
+                spread: 50,
+                startVelocity: 20,
+                origin: { y: 0.6 }
+            });
+        }
+    } else {
+        console.log('Canvas Confetti ライブラリが読み込まれていません');
+    }
+}
+
+// テスト用: 各スコアレンジの演出確認関数
+function testCelebrations() {
+    console.log('🎊 Canvas Confetti 演出テスト開始');
+    console.log('📖 使用方法:');
+    console.log('  testCelebrations() - 全レベル自動テスト');
+    console.log('  testScore(点数) - 指定スコアをテスト');
+    console.log('  testLevel(1-5) - レベル別テスト');
+    
+    setTimeout(() => {
+        console.log('🎯 レベル1: スコア 50 (最小演出 - 50粒子)');
+        triggerCelebration(50);
+    }, 1000);
+    
+    setTimeout(() => {
+        console.log('🎯 レベル2: スコア 150 (控えめ演出 - 75粒子)');
+        triggerCelebration(150);
+    }, 4000);
+    
+    setTimeout(() => {
+        console.log('🎯 レベル3: スコア 250 (標準演出 - 100粒子)');
+        triggerCelebration(250);
+    }, 7000);
+    
+    setTimeout(() => {
+        console.log('🎯 レベル4: スコア 350 (連続演出 - 150+100粒子)');
+        triggerCelebration(350);
+    }, 10000);
+    
+    setTimeout(() => {
+        console.log('🎯 レベル5: スコア 450 (豪華花火演出 - 200+150+150粒子)');
+        triggerCelebration(450);
+    }, 14000);
+    
+    setTimeout(() => {
+        console.log('✅ 全演出テスト完了！');
+    }, 18000);
+}
+
+// 指定スコアでのテスト
+function testScore(score) {
+    console.log(`🎊 スコア ${score} の演出をテスト中...`);
+    triggerCelebration(score);
+}
+
+// レベル別テスト
+function testLevel(level) {
+    const levels = {
+        1: { score: 50, name: '最小演出', particles: '50粒子' },
+        2: { score: 150, name: '控えめ演出', particles: '75粒子' },
+        3: { score: 250, name: '標準演出', particles: '100粒子' },
+        4: { score: 350, name: '連続演出', particles: '150+100粒子' },
+        5: { score: 450, name: '豪華花火演出', particles: '200+150+150粒子' }
+    };
+    
+    if (levels[level]) {
+        const config = levels[level];
+        console.log(`🎯 レベル${level}: ${config.name} (${config.particles})`);
+        triggerCelebration(config.score);
+    } else {
+        console.log('❌ レベルは1-5の範囲で指定してください');
+        console.log('📖 例: testLevel(3) でレベル3をテスト');
+    }
+}
+
+// 演出の詳細情報表示
+function showCelebrationInfo() {
+    console.log('🎊 Canvas Confetti 演出システム詳細:');
+    console.log('┌─────────┬──────────────┬─────────────┬──────────────┐');
+    console.log('│ スコア  │ 演出レベル   │ 粒子数      │ 特殊効果     │');
+    console.log('├─────────┼──────────────┼─────────────┼──────────────┤');
+    console.log('│ 0-99    │ レベル1      │ 50粒子      │ 基本演出     │');
+    console.log('│ 100-199 │ レベル2      │ 75粒子      │ 控えめ       │');
+    console.log('│ 200-299 │ レベル3      │ 100粒子     │ 標準         │');
+    console.log('│ 300-399 │ レベル4      │ 150+100粒子 │ 連続発射     │');
+    console.log('│ 400+    │ レベル5      │ 200+150x2   │ 豪華花火     │');
+    console.log('└─────────┴──────────────┴─────────────┴──────────────┘');
+    console.log('');
+    console.log('🎮 テストコマンド:');
+    console.log('  testCelebrations() - 全レベル順次テスト');
+    console.log('  testScore(点数) - 指定スコアテスト (例: testScore(275))');
+    console.log('  testLevel(1-5) - レベル別テスト (例: testLevel(4))');
+}
+
 // 東京23区の詳細な境界ポリゴン定義
 const TOKYO_23_WARDS_POLYGON = [
     // 千代田区・中央区・港区エリア
@@ -274,6 +436,12 @@ function completeGame(finalLat, finalLng) {
     .then(response => response.json())
     .then(data => {
         const resultData = data.success ? data.data : data;
+        
+        // スコア演出を実行
+        if (resultData.score !== undefined) {
+            triggerCelebration(resultData.score);
+        }
+        
         // 結果表示
         document.getElementById('result').innerHTML = `
             距離: ${resultData.distance}m<br>
