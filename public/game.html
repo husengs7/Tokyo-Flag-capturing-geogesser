@@ -4,6 +4,7 @@
 <head>
     <title>逆ジオゲッサー</title>
     <meta charset="utf-8">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="game.css">
 </head>
 
@@ -81,7 +82,12 @@
         <a href="/rules" style="color: #1a73e8; text-decoration: none; font-weight: bold;">📋 ルール説明</a>
     </div>
     <div id="game-container">
-        <div id="pano"></div>
+        <div id="pano">
+            <!-- ミニマップ（ストリートビュー全画面時のみ表示） -->
+            <div id="mini-map" class="mini-map-overlay">
+                <div id="mini-map-content"></div>
+            </div>
+        </div>
         <div id="map"></div>
     </div>
 

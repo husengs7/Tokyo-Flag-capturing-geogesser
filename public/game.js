@@ -188,6 +188,186 @@ function showCelebrationInfo() {
     console.log('  testLevel(1-5) - レベル別テスト (例: testLevel(4))');
 }
 
+
+// カスタム全画面機能
+let isStreetViewFullscreen = false;
+let miniMap = null;
+
+function initializeCustomFullscreen() {
+    // カスタム全画面ボタンを追加
+    const fullscreenButton = document.createElement('button');
+    fullscreenButton.id = 'custom-fullscreen-btn';
+    fullscreenButton.innerHTML = '⛶';
+    fullscreenButton.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 3px;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 16px;
+        color: black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    `;
+    
+    fullscreenButton.addEventListener('click', toggleStreetViewFullscreen);
+    document.getElementById('pano').appendChild(fullscreenButton);
+}
+
+function toggleStreetViewFullscreen() {
+    const panoDiv = document.getElementById('pano');
+    const mapDiv = document.getElementById('map');
+    const button = document.getElementById('custom-fullscreen-btn');
+    
+    if (!isStreetViewFullscreen) {
+        // ストリートビューを全画面化
+        mapDiv.style.display = 'none';
+        panoDiv.style.flex = '1';
+        panoDiv.style.width = '100%';
+        button.innerHTML = '◱';
+        isStreetViewFullscreen = true;
+        showMiniMap();
+    } else {
+        // 通常表示に戻す
+        mapDiv.style.display = 'flex';
+        panoDiv.style.flex = '1';
+        panoDiv.style.width = '50%';
+        button.innerHTML = '⛶';
+        isStreetViewFullscreen = false;
+        hideMiniMap();
+    }
+    
+    // Google Mapsのリサイズイベントを発生させる
+    setTimeout(() => {
+        google.maps.event.trigger(panorama, 'resize');
+        google.maps.event.trigger(map, 'resize');
+    }, 100);
+}
+
+function showMiniMap() {
+    const miniMapElement = document.getElementById('mini-map');
+    miniMapElement.style.display = 'block';
+    
+    // ミニマップを初期化（初回のみ）
+    if (!miniMap) {
+        miniMap = new google.maps.Map(document.getElementById('mini-map-content'), {
+            zoom: Math.max(map.getZoom() - 2, 8),
+            center: map.getCenter(),
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+            disableDefaultUI: true,
+            gestureHandling: 'none'
+        });
+        
+        // ミニマップの変更を元のマップに同期するリスナー
+        miniMap.addListener('center_changed', () => {
+            if (document.getElementById('mini-map').classList.contains('expanded')) {
+                map.setCenter(miniMap.getCenter());
+            }
+        });
+        
+        miniMap.addListener('zoom_changed', () => {
+            if (document.getElementById('mini-map').classList.contains('expanded')) {
+                map.setZoom(miniMap.getZoom());
+            }
+        });
+        
+        // ミニマップのクリックイベントを追加
+        miniMapElement.addEventListener('click', (e) => {
+            e.stopPropagation(); // ストリートビューへのクリック伝播を防ぐ
+            toggleMiniMapExpansion();
+        });
+        
+        // ドキュメント全体のクリックイベントで縮小
+        document.addEventListener('click', (e) => {
+            if (miniMapElement.classList.contains('expanded') && 
+                !miniMapElement.contains(e.target)) {
+                collapseMiniMap();
+            }
+        });
+    }
+    
+    // マーカーをミニマップに同期
+    syncMarkersToMiniMap();
+}
+
+function hideMiniMap() {
+    const miniMapElement = document.getElementById('mini-map');
+    miniMapElement.style.display = 'none';
+    // 拡大状態もリセット
+    miniMapElement.classList.remove('expanded');
+}
+
+function toggleMiniMapExpansion() {
+    const miniMapElement = document.getElementById('mini-map');
+    
+    if (!miniMapElement.classList.contains('expanded')) {
+        // 拡大状態にする
+        miniMapElement.classList.add('expanded');
+        // 拡大時はマップ操作を有効にする
+        if (miniMap) {
+            miniMap.setOptions({ gestureHandling: 'auto' });
+        }
+    }
+}
+
+function collapseMiniMap() {
+    const miniMapElement = document.getElementById('mini-map');
+    miniMapElement.classList.remove('expanded');
+    // 縮小時はマップ操作を無効にする
+    if (miniMap) {
+        miniMap.setOptions({ gestureHandling: 'none' });
+    }
+}
+
+function syncMarkersToMiniMap() {
+    if (!miniMap) return;
+    
+    // ミニマップの中心とズームを同期
+    miniMap.setCenter(map.getCenter());
+    miniMap.setZoom(Math.max(map.getZoom() - 2, 8));
+    
+    // フラッグマーカーをミニマップに表示
+    if (flagMarker) {
+        new google.maps.Marker({
+            position: flagMarker.getPosition(),
+            map: miniMap,
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                        <polygon points="3,3 3,21 4.5,21 4.5,13.5 19.5,10.5 4.5,7.5 4.5,3" fill="red" stroke="black" stroke-width="0.75"/>
+                    </svg>
+                `),
+                scaledSize: new google.maps.Size(24, 24)
+            }
+        });
+    }
+    
+    // プレイヤーマーカーをミニマップに表示
+    if (playerMarker) {
+        new google.maps.Marker({
+            position: playerMarker.getPosition(),
+            map: miniMap,
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+                        <circle fill="blue" cx="12" cy="12" r="8"/>
+                        <circle fill="white" cx="12" cy="12" r="4"/>
+                    </svg>
+                `),
+                scaledSize: new google.maps.Size(20, 20),
+                anchor: new google.maps.Point(10, 10)
+            }
+        });
+    }
+}
+
 // 東京23区の詳細な境界ポリゴン定義
 const TOKYO_23_WARDS_POLYGON = [
     // 千代田区・中央区・港区エリア
@@ -494,13 +674,14 @@ function initMap() {
         zoom: 12,
         center: tokyo,
         streetViewControl: false,
-        scaleControl: true,
+        scaleControl: true, // 標準縮尺コントロールを復活
         mapTypeControl: false,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         mapTypeControlOptions: {
             mapTypeIds: [google.maps.MapTypeId.ROADMAP]
         }
     });
+
 
     // ストリートビュー初期化
     panorama = new google.maps.StreetViewPanorama(
@@ -509,7 +690,8 @@ function initMap() {
         pov: { heading: 34, pitch: 10 },
         addressControl: false,
         linksControl: false,
-        showRoadLabels: false
+        showRoadLabels: false,
+        fullscreenControl: false
     }
     );
 
@@ -537,6 +719,9 @@ function initMap() {
 
     // メモ機能の初期化
     initializeMemoFunction();
+
+    // カスタム全画面機能の初期化
+    initializeCustomFullscreen();
 
     // ゲーム開始
     setRandomLocation();
