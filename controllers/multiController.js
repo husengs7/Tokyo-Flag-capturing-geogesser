@@ -15,7 +15,7 @@ exports.createRoom = async (req, res) => {
         });
 
         successResponse(res, {
-            roomId: room._id,
+            roomId: room._id.toString(),
             roomKey: room.roomKey,
             hostId: room.hostId,
             players: room.players,
@@ -25,6 +25,17 @@ exports.createRoom = async (req, res) => {
 
     } catch (error) {
         console.error('ルーム作成エラー:', error);
+        errorResponse(res, error.message, 500);
+    }
+};
+
+// ユーザーのルームクリーンアップ（ルーム参加前に使用）
+exports.cleanupUserRooms = async (req, res) => {
+    try {
+        await RoomService.leaveAllUserRooms(req.user._id);
+        successResponse(res, null, 'ユーザーのルームデータをクリーンアップしました');
+    } catch (error) {
+        console.error('ルームクリーンアップエラー:', error);
         errorResponse(res, error.message, 500);
     }
 };
@@ -41,7 +52,7 @@ exports.joinRoom = async (req, res) => {
         const room = await RoomService.joinRoom(roomKey, req.user._id);
 
         successResponse(res, {
-            roomId: room._id,
+            roomId: room._id.toString(),
             roomKey: room.roomKey,
             players: room.players,
             status: room.status,
@@ -59,12 +70,18 @@ exports.getRoomInfo = async (req, res) => {
     try {
         const { roomId } = req.params;
 
+        // 認証チェック
+        if (!req.user || !req.user._id) {
+            return errorResponse(res, '認証が必要です', 401);
+        }
+
         const room = await RoomService.getRoomInfo(roomId);
 
         // 参加者でない場合は詳細情報を制限
-        const isParticipant = room.players.some(p =>
-            p.userId.toString() === req.user._id.toString()
-        );
+        const isParticipant = room.players.some(p => {
+            const playerId = p.userId._id ? p.userId._id.toString() : p.userId.toString();
+            return playerId === req.user._id.toString();
+        });
 
         if (!isParticipant) {
             return successResponse(res, {
@@ -76,9 +93,9 @@ exports.getRoomInfo = async (req, res) => {
         }
 
         successResponse(res, {
-            roomId: room._id,
+            roomId: room._id.toString(),
             roomKey: room.roomKey,
-            hostId: room.hostId,
+            hostId: room.hostId._id ? room.hostId._id.toString() : room.hostId.toString(),
             players: room.players,
             status: room.status,
             gameState: room.gameState,
@@ -151,16 +168,23 @@ exports.startGame = async (req, res) => {
             return errorResponse(res, '無効な座標です', 400);
         }
 
-        const room = await MultiGameService.startMultiGame(
+        // ホスト権限チェック
+        const room = await RoomService.getRoomInfo(roomId);
+        const hostId = room.hostId._id ? room.hostId._id.toString() : room.hostId.toString();
+        if (hostId !== req.user._id.toString()) {
+            return errorResponse(res, 'ホストのみがゲームを開始できます', 400);
+        }
+
+        const updatedRoom = await MultiGameService.startMultiGame(
             roomId, targetLat, targetLng, playerLat, playerLng
         );
 
         successResponse(res, {
-            roomId: room._id,
-            gameState: room.gameState,
-            status: room.status,
-            currentRound: room.gameState.currentRound,
-            initialDistance: room.gameState.initialDistance
+            roomId: updatedRoom._id,
+            gameState: updatedRoom.gameState,
+            status: updatedRoom.status,
+            currentRound: updatedRoom.gameState.currentRound,
+            initialDistance: updatedRoom.gameState.initialDistance
         }, '第1ラウンドを開始しました');
 
     } catch (error) {

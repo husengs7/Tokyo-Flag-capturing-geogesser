@@ -86,6 +86,7 @@ exports.logout = (req, res) => {
 exports.getMe = (req, res) => {
     if (req.isAuthenticated()) {
         successResponse(res, {
+            _id: req.user._id,
             id: req.user._id,
             username: req.user.username,
             soloStats: req.user.soloStats || { totalScore: 0, playCount: 0, bestScore: 0 },

@@ -3,28 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>オンラインプレイ - ルーム一覧 | Tokyo Flag Capturing Geoguesser</title>
-    <link rel="stylesheet" href="../online.css">
+    <title>オンラインプレイ - ルーム選択 | Tokyo Flag Capturing Geoguesser</title>
+    <link rel="stylesheet" href="/online/online_rooms.css">
 </head>
 <body>
+    <script>
+        // ページロード時に認証状態をチェック
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/auth/me', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    // 未認証の場合はログインページにリダイレクト
+                    window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms');
+                    return;
+                }
+
+                // 認証済みの場合は機能を初期化
+                initializeRoomSelection();
+            } catch (error) {
+                console.error('認証状態確認エラー:', error);
+                window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms');
+            }
+        });
+
+        function initializeRoomSelection() {
+            // ルーム作成ボタンのイベントリスナー
+            document.getElementById('create-room-btn').addEventListener('click', () => {
+                window.location.href = '/rooms/create';
+            });
+
+            // ルーム参加ボタンのイベントリスナー
+            document.getElementById('join-room-btn').addEventListener('click', () => {
+                window.location.href = '/rooms/join';
+            });
+        }
+    </script>
+
     <div class="page-container">
         <header class="page-header">
-            <h1 class="page-title">オンライン ルーム一覧</h1>
+            <h1 class="page-title">オンライン マルチプレイ</h1>
+            <p style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); margin-top: 1rem; font-size: 1.1rem;">
+                ルームを作成するか、既存のルームに参加してください
+            </p>
         </header>
-        
+
         <main class="main-content">
-            <div class="rooms-container">
-                <div class="auth-box">
-                    <h2 class="auth-title">ルーム一覧（準備中）</h2>
-                    <p style="text-align: center; margin: 2rem 0; color: #7f8c8d;">
-                        オンライン対戦機能は現在開発中です。<br>
-                        ログインは正常に完了しました！
+            <!-- ルーム作成・参加選択ボタン -->
+            <div class="room-selection">
+                <div class="selection-buttons">
+                    <button id="create-room-btn" class="selection-btn">
+                        <div class="btn-icon">🏗️</div>
+                        <div class="btn-text">ルーム作成</div>
+                        <div style="font-size: 1rem; color: #666; margin-top: 0.5rem; text-align: center; line-height: 1.3;">
+                            新しいルームを作成
+                        </div>
+                    </button>
+                    <button id="join-room-btn" class="selection-btn">
+                        <div class="btn-icon">🚪</div>
+                        <div class="btn-text">ルーム参加</div>
+                        <div style="font-size: 1rem; color: #666; margin-top: 0.5rem; text-align: center; line-height: 1.3;">
+                            ルームキーで参加
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 説明カード -->
+            <div class="auth-box" style="max-width: 500px; text-align: center;">
+                <h2 class="auth-title">マルチプレイについて</h2>
+                <div style="text-align: left; line-height: 1.6;">
+                    <p style="margin-bottom: 1rem;">
+                        <strong>🏗️ ルーム作成</strong><br>
+                        新しいゲームルームを作成し、友達を招待できます。<br>
+                        プレイヤー数とラウンド数を設定可能です。
                     </p>
-                    <div style="text-align: center; margin-top: 2rem;">
-                        <a href="/" style="display: inline-block; padding: 0.8rem 1.5rem; background: linear-gradient(135deg, #3498db, #2980b9); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
-                            トップページに戻る
-                        </a>
-                    </div>
+                    <p style="margin-bottom: 1rem;">
+                        <strong>🚪 ルーム参加</strong><br>
+                        友達から共有された6桁のルームキーを入力して<br>
+                        既存のルームに参加できます。
+                    </p>
+                    <p style="color: #7f8c8d; font-size: 0.9rem;">
+                        ゲームを開始するには、全プレイヤーが準備完了状態になる必要があります。
+                    </p>
+                </div>
+                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                    <a href="/" style="color: #3498db; text-decoration: none; font-weight: bold;">
+                        🏠 ホームに戻る
+                    </a>
                 </div>
             </div>
         </main>

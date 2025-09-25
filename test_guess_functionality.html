@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Guess Button Test</title>
+    <style>
+        body { margin: 20px; font-family: Arial, sans-serif; }
+        .test-result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+    </style>
+</head>
+<body>
+    <h1>Guess Button Functionality Test</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // テスト結果を表示する関数
+        function addTestResult(test, status, message) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${status}`;
+            resultDiv.innerHTML = `<strong>${test}:</strong> ${message}`;
+            document.getElementById('test-results').appendChild(resultDiv);
+        }
+
+        // online_game.js の重要な関数をシミュレートしてテスト
+        function testGuessButtonLogic() {
+            addTestResult('Test 1', 'warning', 'Testing guess button logic simulation...');
+
+            // 1. playerMarker が null の場合のテスト
+            let playerMarker = null;
+            let hasSubmittedGuess = false;
+
+            function simulateSubmitGuess() {
+                if (!playerMarker || hasSubmittedGuess) {
+                    return { success: false, reason: 'playerMarker is null or already submitted' };
+                }
+                return { success: true, reason: 'Valid guess submission' };
+            }
+
+            // Test Case 1: playerMarker が null
+            let result1 = simulateSubmitGuess();
+            addTestResult('Test 1A - playerMarker null',
+                         result1.success ? 'error' : 'success',
+                         `Expected failure: ${result1.reason}`);
+
+            // Test Case 2: playerMarker が存在する場合
+            playerMarker = { getPosition: () => ({ lat: () => 35.6762, lng: () => 139.6503 }) };
+            let result2 = simulateSubmitGuess();
+            addTestResult('Test 1B - playerMarker exists',
+                         result2.success ? 'success' : 'error',
+                         `Expected success: ${result2.reason}`);
+
+            // Test Case 3: 既に推測済みの場合
+            hasSubmittedGuess = true;
+            let result3 = simulateSubmitGuess();
+            addTestResult('Test 1C - Already submitted',
+                         result3.success ? 'error' : 'success',
+                         `Expected failure: ${result3.reason}`);
+        }
+
+        function testMapClickLogic() {
+            addTestResult('Test 2', 'warning', 'Testing map click and guess marker creation...');
+
+            // マップクリック時のsetGuessLocation関数をシミュレート
+            let playerMarker = null;
+            let hasSubmittedGuess = false;
+
+            function simulateSetGuessLocation(latLng) {
+                if (hasSubmittedGuess) return false;
+
+                // 既存のマーカーを削除（シミュレーション）
+                if (playerMarker) {
+                    playerMarker = null; // setMap(null)のシミュレーション
+                }
+
+                // 新しいマーカーを作成（シミュレーション）
+                playerMarker = {
+                    position: latLng,
+                    getPosition: () => latLng
+                };
+
+                return true;
+            }
+
+            // Test Case 1: 通常のマップクリック
+            let testLatLng = { lat: () => 35.6762, lng: () => 139.6503 };
+            let clickResult = simulateSetGuessLocation(testLatLng);
+            addTestResult('Test 2A - Map click',
+                         clickResult ? 'success' : 'error',
+                         clickResult ? 'Marker created successfully' : 'Failed to create marker');
+
+            // Test Case 2: マーカー作成後のguess確認
+            function checkGuessReady() {
+                return playerMarker !== null && !hasSubmittedGuess;
+            }
+
+            let guessReady = checkGuessReady();
+            addTestResult('Test 2B - Guess ready',
+                         guessReady ? 'success' : 'error',
+                         guessReady ? 'Guess button should be enabled' : 'Guess button should be disabled');
+
+            // Test Case 3: 推測済み後のクリック
+            hasSubmittedGuess = true;
+            let clickAfterGuess = simulateSetGuessLocation(testLatLng);
+            addTestResult('Test 2C - Click after guess',
+                         !clickAfterGuess ? 'success' : 'error',
+                         !clickAfterGuess ? 'Correctly ignores click after guess' : 'Should ignore clicks after guess');
+        }
+
+        function runDiagnostics() {
+            addTestResult('Diagnostics', 'warning', 'Running system diagnostics...');
+
+            // Check common issues
+            const issues = [];
+
+            // Check if button exists in DOM (simulation)
+            if (typeof document.getElementById === 'undefined') {
+                issues.push('DOM access not available');
+            }
+
+            // Check if guess button would exist
+            issues.push('Note: This is a simulation - real DOM elements not checked');
+
+            if (issues.length === 0) {
+                addTestResult('System Check', 'success', 'No obvious issues detected in logic');
+            } else {
+                issues.forEach((issue, index) => {
+                    addTestResult(`Issue ${index + 1}`, 'warning', issue);
+                });
+            }
+        }
+
+        // 診断実行
+        document.addEventListener('DOMContentLoaded', () => {
+            addTestResult('Start', 'warning', 'Beginning guess button functionality tests...');
+
+            testGuessButtonLogic();
+            testMapClickLogic();
+            runDiagnostics();
+
+            addTestResult('Conclusion', 'warning',
+                         'Main Issue Identified: submitGuess() returns early if playerMarker is null. ' +
+                         'playerMarker is created by setGuessLocation() when user clicks map. ' +
+                         'If map clicks are not working or setGuessLocation() is not being called, ' +
+                         'playerMarker will remain null and guess button will not function.');
+        });
+    </script>
+</body>
+</html>

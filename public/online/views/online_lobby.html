@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ルームロビー - オンラインプレイ | Tokyo Flag Capturing Geoguesser</title>
+    <link rel="stylesheet" href="/online/online_rooms.css">
+</head>
+<body>
+    <script>
+        let roomId = null;
+        let currentUser = null;
+        let isHost = false;
+        let pollInterval = null;
+
+        // ページロード時の初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('lobby page loading...');
+
+            // リダイレクトループ防止用フラグ
+            if (sessionStorage.getItem('lobbyRedirecting') === 'true') {
+                console.log('リダイレクトループを検出、ループを中断');
+                showError('認証エラーが発生しました。再度ログインしてください。');
+                sessionStorage.removeItem('lobbyRedirecting');
+                return;
+            }
+
+            try {
+                // URLパラメータからルームIDを取得
+                const urlParams = new URLSearchParams(window.location.search);
+                roomId = urlParams.get('roomId');
+
+                console.log('Room ID:', roomId);
+
+                if (!roomId) {
+                    showError('ルームIDが指定されていません');
+                    return;
+                }
+
+                console.log('認証状態チェック開始...');
+
+                // 認証状態をチェック
+                const authResponse = await fetch('/auth/me', {
+                    credentials: 'include'
+                });
+
+                console.log('認証レスポンス:', authResponse.status, authResponse.ok);
+
+                if (!authResponse.ok) {
+                    console.error('認証チェックエラー:', authResponse.status);
+                    sessionStorage.setItem('lobbyRedirecting', 'true');
+                    setTimeout(() => {
+                        window.location.href = '/login?returnUrl=' + encodeURIComponent(`/online/views/online_lobby.html?roomId=${roomId}`);
+                    }, 1000);
+                    return;
+                }
+
+                const authData = await authResponse.json();
+                console.log('認証データ:', authData);
+
+                if (!authData || !authData.success || !authData.data) {
+                    console.error('認証失敗またはユーザー情報なし:', authData);
+                    sessionStorage.setItem('lobbyRedirecting', 'true');
+                    setTimeout(() => {
+                        window.location.href = '/login?returnUrl=' + encodeURIComponent(`/online/views/online_lobby.html?roomId=${roomId}`);
+                    }, 1000);
+                    return;
+                }
+
+                currentUser = authData.data; // authData.user -> authData.data
+                console.log('認証済みユーザー:', currentUser);
+
+                // ロビー機能を初期化
+                await initializeLobby();
+
+                // 定期的にルーム情報を更新
+                startPolling();
+
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                showError(`ページの初期化に失敗しました: ${error.message}`);
+            }
+        });
+
+        async function initializeLobby() {
+            // ルーム情報を取得
+            await updateRoomInfo();
+
+            // ボタンイベントリスナーを設定
+            document.getElementById('ready-btn')?.addEventListener('click', handleReadyOrStart);
+            document.getElementById('leave-room-btn')?.addEventListener('click', leaveRoom);
+        }
+
+        async function updateRoomInfo() {
+            try {
+                console.log('ルーム情報取得開始...', roomId);
+
+                const response = await fetch(`/multi/rooms/${roomId}`, {
+                    credentials: 'include'
+                });
+
+                console.log('ルーム情報レスポンス:', response.status, response.ok);
+
+                // レスポンスの状態を確認
+                if (!response.ok) {
+                    console.error('HTTP Error:', response.status, response.statusText);
+                    if (response.status === 401) {
+                        showError('認証エラー: ログインしてください');
+                        stopPolling(); // ポーリングを停止
+                        sessionStorage.setItem('lobbyRedirecting', 'true');
+                        setTimeout(() => {
+                            window.location.href = '/login';
+                        }, 2000);
+                        return;
+                    }
+                    if (response.status === 404) {
+                        showError('ルームが見つかりません');
+                        stopPolling();
+                        return;
+                    }
+                    showError(`サーバーエラー: ${response.status}`);
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('Room data received:', data);
+
+                if (data.success) {
+                    // 正常にデータを取得できた場合、リダイレクトフラグをクリア
+                    sessionStorage.removeItem('lobbyRedirecting');
+                    renderRoomInfo(data.data);
+                } else {
+                    console.error('ルーム情報取得失敗:', data);
+                    showError(data.message || 'ルーム情報の取得に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('ルーム情報取得エラー:', error);
+                showError(`ネットワークエラー: ${error.message}`);
+                // ネットワークエラーの場合はポーリングを停止
+                stopPolling();
+            }
+        }
+
+        function renderRoomInfo(roomData) {
+            // 基本情報を表示
+            document.getElementById('room-key-display').textContent = roomData.roomKey;
+            document.getElementById('player-count').textContent = roomData.players.length;
+            document.getElementById('max-players').textContent = roomData.settings.maxPlayers;
+            document.getElementById('round-count').textContent = roomData.settings.roundCount;
+
+            // ホストかどうかを確認
+            console.log('ホスト判定:', {
+                hostId: roomData.hostId,
+                currentUserId: currentUser.id,
+                currentUser: currentUser
+            });
+            isHost = roomData.hostId === currentUser.id;
+
+            // ゲーム開始状態をチェック（全プレイヤー用）
+            if (roomData.status === 'playing') {
+                console.log('ゲームが開始されました。ゲーム画面に移動します...');
+                stopPolling(); // ポーリングを停止
+                showGameStartMessage();
+                setTimeout(() => {
+                    window.location.href = `/online/views/online_game.html?roomId=${roomId}`;
+                }, 2000); // 2秒後にゲーム画面に移動
+                return;
+            }
+
+            // プレイヤーリストを表示
+            renderPlayerList(roomData.players);
+
+            // ボタンの状態を更新
+            updateButtons(roomData);
+        }
+
+        function renderPlayerList(players) {
+            const playersList = document.getElementById('players-list');
+            playersList.innerHTML = '';
+
+            players.forEach(player => {
+                const playerElement = document.createElement('div');
+                playerElement.className = 'player-item';
+
+                const readyStatus = player.isReady ? '✅ 準備完了' : '⏳ 待機中';
+                const hostBadge = player.isHost ? '👑 ' : '';
+
+                playerElement.innerHTML = `
+                    <div class="player-info">
+                        <span class="player-name">${hostBadge}${player.username}</span>
+                        <span class="player-status ${player.isReady ? 'ready' : 'waiting'}">${readyStatus}</span>
+                    </div>
+                `;
+
+                playersList.appendChild(playerElement);
+            });
+        }
+
+        function updateButtons(roomData) {
+            const readyBtn = document.getElementById('ready-btn');
+
+            if (isHost) {
+                // ホストの場合 - 準備ボタンをゲームスタートボタンに変更
+                readyBtn.style.display = 'block';
+
+                // 全員が準備完了かチェック
+                const allReady = roomData.players.every(p => p.isHost || p.isReady);
+                const hasEnoughPlayers = roomData.players.length >= 2;
+
+                console.log('ホスト用ボタン状態:', {
+                    allReady,
+                    hasEnoughPlayers,
+                    playersCount: roomData.players.length,
+                    players: roomData.players.map(p => ({ name: p.username, isReady: p.isReady, isHost: p.isHost }))
+                });
+
+                // ボタンをゲームスタートボタンのスタイルに変更
+                readyBtn.className = 'lobby-start-game-button';
+                readyBtn.disabled = !allReady || !hasEnoughPlayers;
+
+                // 星のSVGを追加
+                if (!readyBtn.querySelector('.star-1')) {
+                    readyBtn.innerHTML = `
+                        Game Start !!
+                        <div class="star-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="star-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="star-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="star-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="star-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="star-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 784.11 815.53">
+                                <path class="fil0" d="M392.05 0c-20.9,210.08 -184.06,378.41 -392.05,407.78 207.96,29.37 371.12,197.68 392.05,407.74 20.93,-210.06 184.09,-378.37 392.05,-407.74 -207.98,-29.38 -371.16,-197.69 -392.06,-407.78z"></path>
+                            </svg>
+                        </div>
+                    `;
+                }
+
+                if (allReady && hasEnoughPlayers) {
+                    readyBtn.querySelector('svg').style.display = ''; // 星を表示
+                } else {
+                    // 無効状態のテキストを設定
+                    if (!hasEnoughPlayers) {
+                        readyBtn.childNodes[0].textContent = '最低2人必要です';
+                    } else {
+                        readyBtn.childNodes[0].textContent = 'GameStart !!';
+                    }
+                }
+
+            } else {
+                // 参加者の場合 - 通常の準備ボタン
+                readyBtn.style.display = 'block';
+                readyBtn.className = 'submit-btn';
+
+                const currentUserId = currentUser.id;
+                const currentPlayer = roomData.players.find(p => {
+                    const playerId = p.userId._id || p.userId;
+                    return playerId === currentUserId;
+                });
+                const isCurrentlyReady = currentPlayer ? currentPlayer.isReady : false;
+
+                readyBtn.textContent = isCurrentlyReady ? '準備完了 ✅' : '準備OK';
+                if (isCurrentlyReady) {
+                    readyBtn.className += ' ready-active';
+                }
+                readyBtn.disabled = false;
+            }
+        }
+
+        async function handleReadyOrStart() {
+            if (isHost) {
+                // ホストの場合はゲーム開始
+                await startGame();
+            } else {
+                // 参加者の場合は準備状態切り替え
+                await toggleReady();
+            }
+        }
+
+        async function toggleReady() {
+            try {
+                const readyBtn = document.getElementById('ready-btn');
+                const isCurrentlyReady = readyBtn.textContent.includes('✅');
+
+                console.log('準備状態変更開始:', { isCurrentlyReady, newState: !isCurrentlyReady });
+
+                const response = await fetch(`/multi/rooms/${roomId}/ready`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        isReady: !isCurrentlyReady
+                    })
+                });
+
+                console.log('準備状態変更レスポンス:', response.status, response.ok);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('準備状態変更HTTP Error:', response.status, errorText);
+                    showError(`準備状態の更新に失敗しました (${response.status})`);
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('準備状態変更データ:', data);
+
+                if (data.success) {
+                    // 直接ボタンの状態を更新（ポーリングで同期を取る）
+                    updateReadyButton(data.data.isReady);
+
+                    // ルーム情報の更新は必要な場合のみ行う
+                    try {
+                        await updateRoomInfo();
+                    } catch (updateError) {
+                        console.warn('ルーム情報更新でエラーが発生しましたが、準備状態の変更は成功しました:', updateError);
+                        // ルーム情報更新のエラーは致命的ではないため、ポーリングで回復を期待
+                    }
+                } else {
+                    showError(data.message || '準備状態の更新に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('準備状態更新エラー:', error);
+                showError(`準備状態の変更でネットワークエラーが発生しました: ${error.message}`);
+            }
+        }
+
+        // 準備ボタンの状態を直接更新する関数
+        function updateReadyButton(isReady) {
+            const readyBtn = document.getElementById('ready-btn');
+            if (readyBtn && !isHost) {
+                readyBtn.textContent = isReady ? '準備完了 ✅' : '準備OK';
+                if (isReady) {
+                    readyBtn.className = 'submit-btn ready-active';
+                } else {
+                    readyBtn.className = 'submit-btn';
+                }
+            }
+        }
+
+        // 東京都内のランダムな座標を生成する関数
+        function generateRandomTokyoLocation() {
+            // 東京駅周辺の座標範囲
+            const minLat = 35.5;
+            const maxLat = 35.8;
+            const minLng = 139.4;
+            const maxLng = 139.9;
+
+            return {
+                lat: minLat + Math.random() * (maxLat - minLat),
+                lng: minLng + Math.random() * (maxLng - minLng)
+            };
+        }
+
+        // プレイヤー開始位置を必ず3km圏内に生成（厳密な距離チェック付き）
+        function generatePlayerStartPosition(targetLocation) {
+            let attempts = 0;
+            const maxAttempts = 100; // 試行回数を増加
+
+            // 距離計算関数（haversine formula）
+            function calculateDistance(lat1, lng1, lat2, lng2) {
+                const R = 6371000; // 地球の半径（メートル）
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLng = (lng2 - lng1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                        Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            function tryGeneratePosition() {
+                if (attempts >= maxAttempts) {
+                    // 最大試行回数に達した場合は確実に1km圏内の位置を返す
+                    console.warn(`最大試行回数(${maxAttempts})に達しました。1km圏内にフォールバック`);
+                    const angle = Math.random() * 2 * Math.PI;
+                    const distance = 500 + Math.random() * 500; // 500m-1000m
+                    const offsetLat = (distance * Math.cos(angle)) / 111320;
+                    const offsetLng = (distance * Math.sin(angle)) / (111320 * Math.cos(targetLocation.lat * Math.PI / 180));
+                    return {
+                        lat: targetLocation.lat + offsetLat,
+                        lng: targetLocation.lng + offsetLng
+                    };
+                }
+
+                // フラッグから100m～3km圏内のランダムな位置を生成
+                const angle = Math.random() * 2 * Math.PI;
+                const distance = 100 + Math.random() * 2900; // 100m～3000m
+
+                // 座標変換（メートルから度に変換）
+                const offsetLat = (distance * Math.cos(angle)) / 111320;
+                const offsetLng = (distance * Math.sin(angle)) / (111320 * Math.cos(targetLocation.lat * Math.PI / 180));
+
+                const playerPos = {
+                    lat: targetLocation.lat + offsetLat,
+                    lng: targetLocation.lng + offsetLng
+                };
+
+                // 実際の距離を計算して確認
+                const actualDistance = calculateDistance(targetLocation.lat, targetLocation.lng, playerPos.lat, playerPos.lng);
+
+                // 厳密な3km制限チェック
+                if (actualDistance >= 100 && actualDistance <= 3000) {
+                    // 東京23区内チェック
+                    if (playerPos.lat >= 35.5 && playerPos.lat <= 35.8 &&
+                        playerPos.lng >= 139.4 && playerPos.lng <= 139.9) {
+                        console.log(`✅ 有効な位置生成: 距離=${Math.round(actualDistance)}m (試行回数: ${attempts + 1})`);
+                        return playerPos;
+                    }
+                }
+
+                attempts++;
+                return tryGeneratePosition();
+            }
+
+            const result = tryGeneratePosition();
+
+            // 最終検証
+            const finalDistance = calculateDistance(targetLocation.lat, targetLocation.lng, result.lat, result.lng);
+            console.log(`🎯 最終生成位置: 距離=${Math.round(finalDistance)}m`);
+
+            return result;
+        }
+
+        async function startGame() {
+            try {
+                console.log('ゲームを開始しています...');
+                const startBtn = document.getElementById('ready-btn');
+                startBtn.disabled = true;
+                startBtn.textContent = 'ゲームを開始中...';
+
+                // 全プレイヤー共通の座標を生成（game.jsと同じシステム）
+                const targetLocation = generateRandomTokyoLocation();
+
+                // プレイヤー位置をターゲットから300m-3km圏内に設定（game.jsから移植）
+                const playerLocation = generatePlayerStartPosition(targetLocation);
+
+                console.log('生成された座標:', { targetLocation, playerLocation });
+
+                // ゲーム開始APIを呼び出す
+                const response = await fetch(`/multi/rooms/${roomId}/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        targetLat: targetLocation.lat,
+                        targetLng: targetLocation.lng,
+                        playerLat: playerLocation.lat,
+                        playerLng: playerLocation.lng
+                    })
+                });
+
+                // 詳細なレスポンス情報をログ出力
+                console.log('ゲーム開始API レスポンス:', {
+                    status: response.status,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('ゲーム開始HTTP Error:', response.status, errorText);
+                    showError(`ゲーム開始に失敗しました (${response.status}): ${errorText}`);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Game Start !!';
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('ゲーム開始API データ:', data);
+
+                if (data.success) {
+                    console.log('ゲーム開始成功:', data);
+                    stopPolling(); // ポーリングを停止
+                    showGameStartMessage();
+                    // ホストもゲーム画面に移動
+                    setTimeout(() => {
+                        window.location.href = `/online/views/online_game.html?roomId=${roomId}`;
+                    }, 2000);
+                } else {
+                    console.error('ゲーム開始失敗:', data);
+                    showError(data.message || 'ゲームの開始に失敗しました');
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Game Start !!';
+                }
+
+            } catch (error) {
+                console.error('ゲーム開始エラー:', error);
+                showError(`ゲーム開始でネットワークエラーが発生しました: ${error.message}`);
+                const startBtn = document.getElementById('ready-btn');
+                startBtn.disabled = false;
+                startBtn.textContent = 'Game Start !!';
+            }
+        }
+
+        async function leaveRoom() {
+            if (!confirm('ルームを退出しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/multi/rooms/${roomId}/leave`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = '/rooms';
+                } else {
+                    showError(data.message || 'ルーム退出に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('ルーム退出エラー:', error);
+                showError('ネットワークエラーが発生しました');
+            }
+        }
+
+        function startPolling() {
+            pollInterval = setInterval(updateRoomInfo, 3000); // 3秒ごとに更新
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('error-display');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        function showGameStartMessage() {
+            // 既存のエラーメッセージを隠す
+            const errorElement = document.getElementById('error-display');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+
+            // ゲーム開始メッセージを表示
+            const messageElement = document.createElement('div');
+            messageElement.className = 'game-start-message';
+            messageElement.innerHTML = `
+                <div style="background-color: rgba(46, 204, 113, 0.1); border: 2px solid #2ecc71; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; color: #27ae60; text-align: center; font-size: 1.2rem; font-weight: bold;">
+                    🎮 ゲームが開始されました！<br>
+                    <span style="font-size: 1rem; font-weight: normal;">ゲーム画面に移動しています...</span>
+                </div>
+            `;
+
+            const mainContent = document.querySelector('.main-content');
+            const firstChild = mainContent.firstElementChild;
+            mainContent.insertBefore(messageElement, firstChild);
+        }
+
+        // ページを離れる時にポーリングを停止
+        window.addEventListener('beforeunload', () => {
+            stopPolling();
+        });
+
+        // コピー機能
+        async function copyRoomKey() {
+            const roomKey = document.getElementById('room-key-display').textContent;
+            const copyBtn = document.getElementById('copy-btn');
+
+            try {
+                await navigator.clipboard.writeText(roomKey);
+
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅';
+                copyBtn.style.color = '#28a745';
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.color = '';
+                }, 2000);
+
+            } catch (error) {
+                console.error('クリップボードコピーエラー:', error);
+                alert('ルームキーをコピーできませんでした: ' + roomKey);
+            }
+        }
+    </script>
+
+    <div class="page-container">
+        <header class="page-header">
+            <h1 class="page-title">ルームロビー</h1>
+            <p style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); margin-top: 1rem; font-size: 1.1rem;">
+                プレイヤーが集まるのを待っています
+            </p>
+        </header>
+
+        <main class="main-content">
+            <!-- エラー表示 -->
+            <div id="error-display" class="error-message" style="display: none;"></div>
+
+            <!-- ルーム情報とプレイヤーリストのコンテナ -->
+            <div class="room-info-container">
+                <!-- ルーム情報カード -->
+                <div class="auth-box room-info-card">
+                    <h2 class="auth-title">🏠 ルーム情報</h2>
+
+                    <!-- ルームキー表示 -->
+                    <div class="room-key-display">
+                        <span class="label">ルームキー:</span>
+                        <span id="room-key-display" class="room-key">------</span>
+                        <button id="copy-btn" class="copy-btn" title="ルームキーをコピー" onclick="copyRoomKey()">📋</button>
+                    </div>
+
+                    <!-- ルーム設定情報 -->
+                    <div class="room-details">
+                        <p><strong>参加者:</strong> <span id="player-count">0</span>/<span id="max-players">4</span>人</p>
+                        <p><strong>ラウンド数:</strong> <span id="round-count">3</span>ラウンド</p>
+                    </div>
+                </div>
+
+                <!-- プレイヤーリスト -->
+                <div class="auth-box players-card">
+                    <h3 class="auth-title">👥 参加プレイヤー</h3>
+                    <div id="players-list" class="players-list">
+                        <!-- プレイヤーはJavaScriptで動的に追加されます -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div style="max-width: 500px; margin: 0 auto;">
+                <div class="action-buttons">
+                    <button id="ready-btn" class="submit-btn" style="display: none;">準備OK</button>
+                    <button id="leave-room-btn" class="secondary-btn">ルームを退出</button>
+                </div>
+
+                <!-- ヘルプテキスト -->
+                <div style="margin-top: 1.5rem; padding: 1rem; background-color: rgba(52, 152, 219, 0.1); border-radius: 8px; border: 1px solid rgba(52, 152, 219, 0.3);">
+                    <p style="margin: 0; font-size: 0.9rem; color: #2c3e50;">
+                        <strong>💡 ゲーム開始条件:</strong><br>
+                        • 最低2人のプレイヤーが必要です<br>
+                        • 全ての参加者が「準備OK」状態になる必要があります<br>
+                        • ホストが「ゲーム開始」ボタンを押すとゲームが始まります
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <style>
+        .players-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .player-item {
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .player-status {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .player-status.ready {
+            color: #27ae60;
+        }
+
+        .player-status.waiting {
+            color: #f39c12;
+        }
+
+        .ready-active {
+            background: linear-gradient(135deg, #27ae60, #229954) !important;
+        }
+
+        .error-message {
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: #e74c3c;
+            text-align: center;
+        }
+
+        /* ホスト用ゲームスタートボタンのスタイル（rules.htmlから応用） */
+        .lobby-start-game-button {
+            position: relative;
+            padding: 20px 50px;
+            margin: 20px auto;
+            display: block;
+            background: #fec195;
+            font-size: 24px;
+            font-weight: 600;
+            color: #181818;
+            border: 4px solid #fec195;
+            border-radius: 12px;
+            box-shadow: 0 0 0 #fec1958c;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            min-height: 80px;
+        }
+
+        .lobby-start-game-button:disabled {
+            background: #cccccc;
+            border-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
+
+        .lobby-start-game-button:disabled .star-1,
+        .lobby-start-game-button:disabled .star-2,
+        .lobby-start-game-button:disabled .star-3,
+        .lobby-start-game-button:disabled .star-4,
+        .lobby-start-game-button:disabled .star-5,
+        .lobby-start-game-button:disabled .star-6 {
+            display: none;
+        }
+
+        .lobby-start-game-button .star-1,
+        .lobby-start-game-button .star-2,
+        .lobby-start-game-button .star-3,
+        .lobby-start-game-button .star-4,
+        .lobby-start-game-button .star-5,
+        .lobby-start-game-button .star-6 {
+            position: absolute;
+            filter: drop-shadow(0 0 0 #fffdef);
+            z-index: -5;
+            transition: all 1s cubic-bezier(0.05, 0.83, 0.43, 0.96);
+        }
+
+        .lobby-start-game-button .star-1 {
+            top: 20%;
+            left: 20%;
+            width: 25px;
+            height: auto;
+        }
+
+        .lobby-start-game-button .star-2 {
+            top: 45%;
+            left: 45%;
+            width: 15px;
+            height: auto;
+        }
+
+        .lobby-start-game-button .star-3 {
+            top: 40%;
+            left: 40%;
+            width: 5px;
+            height: auto;
+        }
+
+        .lobby-start-game-button .star-4 {
+            top: 20%;
+            left: 40%;
+            width: 8px;
+            height: auto;
+        }
+
+        .lobby-start-game-button .star-5 {
+            top: 25%;
+            left: 45%;
+            width: 15px;
+            height: auto;
+        }
+
+        .lobby-start-game-button .star-6 {
+            top: 5%;
+            left: 50%;
+            width: 5px;
+            height: auto;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover {
+            background: transparent;
+            color: #fec195;
+            box-shadow: 0 0 25px #fec1958c;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-1 {
+            top: -80%;
+            left: -30%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-2 {
+            top: -25%;
+            left: 10%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-3 {
+            top: 55%;
+            left: 25%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-4 {
+            top: 30%;
+            left: 80%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-5 {
+            top: 25%;
+            left: 115%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button:not(:disabled):hover .star-6 {
+            top: 5%;
+            left: 60%;
+            filter: drop-shadow(0 0 10px #fffdef);
+            z-index: 2;
+        }
+
+        .lobby-start-game-button .fil0 {
+            fill: #fffdef;
+        }
+
+        /* ルーム情報とプレイヤーリストの横並び */
+        .room-info-container {
+            display: flex;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto 2rem auto;
+            align-items: flex-start;
+        }
+
+        .room-info-card,
+        .players-card {
+            flex: 1;
+            max-width: none;
+            min-width: 300px;
+        }
+
+        .room-info-card {
+            flex-basis: 45%;
+        }
+
+        .players-card {
+            flex-basis: 55%;
+        }
+
+        @media (max-width: 768px) {
+            .room-info-container {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .room-info-card,
+            .players-card {
+                flex-basis: auto;
+                max-width: 500px;
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .player-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .room-info-container {
+                gap: 1rem;
+            }
+        }
+    </style>
+</body>
+</html>

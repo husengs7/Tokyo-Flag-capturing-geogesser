@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ルーム作成 - オンラインプレイ | Tokyo Flag Capturing Geoguesser</title>
+    <link rel="stylesheet" href="/online/online_rooms.css">
+</head>
+<body>
+    <script>
+        // ページロード時に認証状態をチェック
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/auth/me', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    // 未認証の場合はログインページにリダイレクト
+                    window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms/create');
+                    return;
+                }
+
+                // 認証済みの場合は機能を初期化
+                initializeRoomCreate();
+            } catch (error) {
+                console.error('認証状態確認エラー:', error);
+                window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms/create');
+            }
+        });
+
+        function initializeRoomCreate() {
+            let currentRoomId = null;
+
+            // フォーム送信
+            document.getElementById('create-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleCreateRoom();
+            });
+
+            // 結果画面のボタン
+            document.getElementById('copy-room-key')?.addEventListener('click', () => {
+                copyRoomKey();
+            });
+
+            document.getElementById('enter-lobby-btn')?.addEventListener('click', () => {
+                enterLobby();
+            });
+
+            document.getElementById('back-to-selection-btn')?.addEventListener('click', () => {
+                window.location.href = '/rooms';
+            });
+
+            document.getElementById('create-another-btn')?.addEventListener('click', () => {
+                resetForm();
+            });
+
+            document.getElementById('retry-btn')?.addEventListener('click', () => {
+                hideResults();
+            });
+
+            async function handleCreateRoom() {
+                const formData = new FormData(document.getElementById('create-form'));
+                const maxPlayers = parseInt(formData.get('maxPlayers'));
+                const roundCount = parseInt(formData.get('roundCount'));
+
+                setLoading(true);
+
+                try {
+                    const response = await fetch('/multi/rooms', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include', // セッション認証のためのクッキーを含める
+                        body: JSON.stringify({
+                            maxPlayers,
+                            roundCount
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showCreateSuccess(data.data);
+                    } else {
+                        showError(data.message || 'ルームの作成に失敗しました');
+                    }
+
+                } catch (error) {
+                    console.error('ルーム作成エラー:', error);
+                    showError('ネットワークエラーが発生しました');
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            function setLoading(loading) {
+                const submitBtn = document.getElementById('create-submit-btn');
+                const btnText = submitBtn.querySelector('.btn-text');
+                const btnLoading = submitBtn.querySelector('.btn-loading');
+
+                if (loading) {
+                    btnText.style.display = 'none';
+                    btnLoading.style.display = 'flex';
+                    submitBtn.disabled = true;
+                } else {
+                    btnText.style.display = 'block';
+                    btnLoading.style.display = 'none';
+                    submitBtn.disabled = false;
+                }
+            }
+
+            function showCreateSuccess(roomData) {
+                currentRoomId = roomData.roomId;
+
+                document.getElementById('created-room-key').textContent = roomData.roomKey;
+                document.getElementById('created-max-players').textContent = roomData.settings.maxPlayers;
+                document.getElementById('created-round-count').textContent = roomData.settings.roundCount;
+                document.getElementById('created-current-players').textContent = roomData.players.length;
+
+                showResult('create-success');
+            }
+
+            function showError(message) {
+                document.getElementById('error-message').textContent = message;
+                showResult('error-display');
+            }
+
+            function showResult(resultType) {
+                const resultCards = document.querySelectorAll('#result-section > div');
+                resultCards.forEach(card => card.style.display = 'none');
+
+                document.getElementById(resultType).style.display = 'block';
+                document.getElementById('result-section').style.display = 'block';
+                document.getElementById('create-room-form').style.display = 'none';
+            }
+
+            function hideResults() {
+                document.getElementById('result-section').style.display = 'none';
+                document.getElementById('create-room-form').style.display = 'block';
+            }
+
+            function resetForm() {
+                document.getElementById('create-form').reset();
+                hideResults();
+            }
+
+            async function copyRoomKey() {
+                const roomKey = document.getElementById('created-room-key').textContent;
+                const copyBtn = document.getElementById('copy-room-key');
+
+                try {
+                    await navigator.clipboard.writeText(roomKey);
+
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = '✅';
+                    copyBtn.style.color = '#28a745';
+
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                        copyBtn.style.color = '';
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('クリップボードコピーエラー:', error);
+                    alert('ルームキーをコピーできませんでした: ' + roomKey);
+                }
+            }
+
+            function enterLobby() {
+                if (currentRoomId) {
+                    window.location.href = `/online/views/online_lobby.html?roomId=${currentRoomId}`;
+                } else {
+                    showError('ルームIDが見つかりません');
+                }
+            }
+        }
+    </script>
+
+    <div class="page-container">
+        <header class="page-header">
+            <h1 class="page-title">ルーム作成</h1>
+            <p style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); margin-top: 1rem; font-size: 1.1rem;">
+                新しいマルチプレイルームを作成します
+            </p>
+        </header>
+
+        <main class="main-content">
+            <!-- ルーム作成フォーム -->
+            <div id="create-room-form" class="room-form">
+                <div class="auth-box">
+                    <h2 class="auth-title">🏗️ 新しいルームを作成</h2>
+                    <form id="create-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="max-players" class="form-label">最大プレイヤー数:</label>
+                            <select id="max-players" name="maxPlayers" class="form-input">
+                                <option value="2">2人</option>
+                                <option value="3">3人</option>
+                                <option value="4" selected>4人</option>
+                            </select>
+                            <div class="input-hint">ゲームに参加できる最大プレイヤー数を選択してください</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="round-count" class="form-label">ラウンド数:</label>
+                            <select id="round-count" name="roundCount" class="form-input">
+                                <option value="1">1ラウンド</option>
+                                <option value="2">2ラウンド</option>
+                                <option value="3" selected>3ラウンド</option>
+                            </select>
+                            <div class="input-hint">ゲームで遊ぶラウンド数を選択してください</div>
+                        </div>
+                        <button type="submit" class="submit-btn" id="create-submit-btn">
+                            <span class="btn-text">ルームを作成</span>
+                            <div class="btn-loading" style="display: none;">
+                                <div class="spinner"></div>
+                                <span>作成中...</span>
+                            </div>
+                        </button>
+                    </form>
+                    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(0,0,0,0.1); text-align: center;">
+                        <a href="/rooms" style="color: #7f8c8d; text-decoration: none; font-size: 0.9rem;">
+                            ← ルーム選択に戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果表示エリア -->
+            <div id="result-section" class="result-section" style="display: none;">
+                <!-- ルーム作成成功時 -->
+                <div id="create-success" class="auth-box success-box" style="display: none;">
+                    <div class="result-icon">✅</div>
+                    <h3 class="auth-title">ルームが作成されました！</h3>
+                    <div class="room-info">
+                        <div class="room-key-display">
+                            <span class="label">ルームキー:</span>
+                            <span id="created-room-key" class="room-key">------</span>
+                            <button id="copy-room-key" class="copy-btn" title="ルームキーをコピー">📋</button>
+                        </div>
+                        <div class="room-details">
+                            <p><strong>最大プレイヤー数:</strong> <span id="created-max-players">4</span>人</p>
+                            <p><strong>ラウンド数:</strong> <span id="created-round-count">3</span>ラウンド</p>
+                            <p><strong>現在の参加者:</strong> <span id="created-current-players">1</span>人</p>
+                        </div>
+                        <div style="margin-top: 1rem; padding: 1rem; background-color: rgba(52, 152, 219, 0.1); border-radius: 8px; border: 1px solid rgba(52, 152, 219, 0.3);">
+                            <p style="margin: 0; font-size: 0.9rem; color: #2c3e50;">
+                                <strong>💡 友達を招待:</strong><br>
+                                上記のルームキーを友達に共有して、ルームに参加してもらいましょう！
+                            </p>
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="enter-lobby-btn" class="submit-btn">ロビーに入る</button>
+                        <button id="create-another-btn" class="secondary-btn">新しいルームを作成</button>
+                        <button id="back-to-selection-btn" class="secondary-btn">ルーム選択に戻る</button>
+                    </div>
+                </div>
+
+                <!-- エラー表示 -->
+                <div id="error-display" class="auth-box error-box" style="display: none;">
+                    <div class="result-icon">❌</div>
+                    <h3 class="auth-title">エラーが発生しました</h3>
+                    <p id="error-message" class="error-message">エラーの詳細がここに表示されます</p>
+                    <div class="action-buttons">
+                        <button id="retry-btn" class="secondary-btn">再試行</button>
+                        <a href="/rooms" class="secondary-btn">ルーム選択に戻る</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

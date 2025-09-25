@@ -36,12 +36,25 @@ class MultiGameService {
             // 初期距離を計算
             const initialDistance = calculateDistance(playerLat, playerLng, targetLat, targetLng);
 
+            // 3km制限チェック - プレイヤーとターゲットの距離が3km以内であることを確認
+            if (initialDistance > 3000) {
+                throw new Error(`プレイヤー開始位置がターゲットから3km以上離れています (実際の距離: ${Math.round(initialDistance)}m)`);
+            }
+
+            // 最小距離チェック - あまりに近すぎる場合も制限
+            if (initialDistance < 100) {
+                throw new Error(`プレイヤー開始位置がターゲットに近すぎます (実際の距離: ${Math.round(initialDistance)}m)`);
+            }
+
+            console.log(`✅ 距離検証完了: ${Math.round(initialDistance)}m (100m-3000m圏内)`);
+
             // ゲーム状態を更新
             room.status = 'playing';
             room.gameState = {
                 currentRound: 1,
                 roundStartTime: new Date(),
                 targetLocation: { lat: targetLat, lng: targetLng },
+                // 注意: playerStartLocationは参考値のみ。各プレイヤーは個別にランダムスポーンする
                 playerStartLocation: { lat: playerLat, lng: playerLng },
                 initialDistance: Math.round(initialDistance),
                 allPlayersGuessed: false,
@@ -53,9 +66,10 @@ class MultiGameService {
                 player.totalScore = 0;
                 player.gameScores = [];
                 player.hasGuessed = false;
+                // 注意: 各プレイヤーは個別にランダムスポーンするため、実際の位置はクライアント側で決定される
                 player.currentPosition = {
-                    lat: playerLat,
-                    lng: playerLng,
+                    lat: playerLat, // 参考値（実際はクライアントで個別決定）
+                    lng: playerLng, // 参考値（実際はクライアントで個別決定）
                     timestamp: new Date()
                 };
             });

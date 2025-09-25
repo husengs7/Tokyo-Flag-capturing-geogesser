@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ルーム参加 - オンラインプレイ | Tokyo Flag Capturing Geoguesser</title>
+    <link rel="stylesheet" href="/online/online_rooms.css">
+</head>
+<body>
+    <script>
+        // ページロード時に認証状態をチェック
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/auth/me', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    // 未認証の場合はログインページにリダイレクト
+                    window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms/join');
+                    return;
+                }
+
+                // 認証済みの場合は機能を初期化
+                await initializeRoomJoin();
+            } catch (error) {
+                console.error('認証状態確認エラー:', error);
+                window.location.href = '/login?returnUrl=' + encodeURIComponent('/rooms/join');
+            }
+        });
+
+        async function initializeRoomJoin() {
+            let currentRoomId = null;
+
+            // ページロード時にユーザーのルームデータをクリーンアップ
+            try {
+                console.log('ルーム参加ページ: 既存ルームデータをクリーンアップ中...');
+                const cleanupResponse = await fetch('/multi/rooms/cleanup', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (cleanupResponse.ok) {
+                    console.log('ルーム参加ページ: クリーンアップ完了');
+                } else {
+                    console.warn('ルーム参加ページ: クリーンアップ警告:', await cleanupResponse.text());
+                }
+            } catch (error) {
+                console.error('ルーム参加ページ: クリーンアップエラー:', error);
+                // エラーが発生してもページの機能は継続
+            }
+
+            // フォーム送信
+            document.getElementById('join-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleJoinRoom();
+            });
+
+            // 結果画面のボタン
+            document.getElementById('enter-joined-lobby-btn')?.addEventListener('click', () => {
+                enterLobby();
+            });
+
+            document.getElementById('back-to-selection-btn')?.addEventListener('click', () => {
+                window.location.href = '/rooms';
+            });
+
+            document.getElementById('join-another-btn')?.addEventListener('click', () => {
+                resetForm();
+            });
+
+            document.getElementById('retry-btn')?.addEventListener('click', () => {
+                hideResults();
+            });
+
+            // ルームキー入力の自動フォーマット
+            const roomKeyInput = document.getElementById('room-key');
+            roomKeyInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            });
+
+            async function handleJoinRoom() {
+                const formData = new FormData(document.getElementById('join-form'));
+                const roomKey = formData.get('roomKey').trim().toUpperCase();
+
+                if (roomKey.length !== 6) {
+                    showError('ルームキーは6桁で入力してください');
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    const response = await fetch('/multi/rooms/join', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include', // セッション認証のためのクッキーを含める
+                        body: JSON.stringify({ roomKey })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showJoinSuccess(data.data);
+                    } else {
+                        showError(data.message || 'ルームへの参加に失敗しました');
+                    }
+
+                } catch (error) {
+                    console.error('ルーム参加エラー:', error);
+                    showError('ネットワークエラーが発生しました');
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            function setLoading(loading) {
+                const submitBtn = document.getElementById('join-submit-btn');
+                const btnText = submitBtn.querySelector('.btn-text');
+                const btnLoading = submitBtn.querySelector('.btn-loading');
+
+                if (loading) {
+                    btnText.style.display = 'none';
+                    btnLoading.style.display = 'flex';
+                    submitBtn.disabled = true;
+                } else {
+                    btnText.style.display = 'block';
+                    btnLoading.style.display = 'none';
+                    submitBtn.disabled = false;
+                }
+            }
+
+            function showJoinSuccess(roomData) {
+                currentRoomId = roomData.roomId;
+
+                document.getElementById('joined-room-key').textContent = roomData.roomKey;
+                document.getElementById('joined-current-players').textContent = roomData.players.length;
+
+                const maxPlayers = roomData.gameState?.settings?.maxPlayers || roomData.settings?.maxPlayers || '不明';
+                document.getElementById('joined-max-players').textContent = maxPlayers;
+
+                // プレイヤーリストを表示
+                const playersList = document.getElementById('players-list');
+                playersList.innerHTML = '';
+                roomData.players.forEach(player => {
+                    const playerElement = document.createElement('div');
+                    playerElement.style.cssText = 'padding: 0.5rem; background-color: rgba(52, 152, 219, 0.1); border-radius: 5px; margin: 0.3rem 0; display: flex; justify-content: space-between; align-items: center;';
+                    playerElement.innerHTML = `
+                        <span>${player.username}</span>
+                        <span style="font-size: 0.8rem; color: #7f8c8d;">${player.isHost ? '👑 ホスト' : '👤 プレイヤー'}</span>
+                    `;
+                    playersList.appendChild(playerElement);
+                });
+
+                showResult('join-success');
+            }
+
+            function showError(message) {
+                document.getElementById('error-message').textContent = message;
+                showResult('error-display');
+            }
+
+            function showResult(resultType) {
+                const resultCards = document.querySelectorAll('#result-section > div');
+                resultCards.forEach(card => card.style.display = 'none');
+
+                document.getElementById(resultType).style.display = 'block';
+                document.getElementById('result-section').style.display = 'block';
+                document.getElementById('join-room-form').style.display = 'none';
+            }
+
+            function hideResults() {
+                document.getElementById('result-section').style.display = 'none';
+                document.getElementById('join-room-form').style.display = 'block';
+            }
+
+            function resetForm() {
+                document.getElementById('join-form').reset();
+                hideResults();
+            }
+
+            function enterLobby() {
+                if (currentRoomId) {
+                    window.location.href = `/online/views/online_lobby.html?roomId=${currentRoomId}`;
+                } else {
+                    showError('ルームIDが見つかりません');
+                }
+            }
+        }
+    </script>
+
+    <div class="page-container">
+        <header class="page-header">
+            <h1 class="page-title">ルーム参加</h1>
+            <p style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); margin-top: 1rem; font-size: 1.1rem;">
+                既存のルームに参加します
+            </p>
+        </header>
+
+        <main class="main-content">
+            <!-- ルーム参加フォーム -->
+            <div id="join-room-form" class="room-form">
+                <div class="auth-box">
+                    <h2 class="auth-title">🚪 ルームに参加</h2>
+                    <form id="join-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="room-key" class="form-label">ルームキー (6桁):</label>
+                            <input
+                                type="text"
+                                id="room-key"
+                                name="roomKey"
+                                class="form-input"
+                                placeholder="例: ABC123"
+                                maxlength="6"
+                                pattern="[A-Za-z0-9]{6}"
+                                required
+                                style="text-align: center; letter-spacing: 4px; font-size: 1.2rem; font-family: 'Courier New', monospace;"
+                            >
+                            <div class="input-hint">
+                                ホストから共有された6桁のルームキーを入力してください<br>
+                                英数字のみ使用可能（自動的に大文字に変換されます）
+                            </div>
+                        </div>
+                        <button type="submit" class="submit-btn" id="join-submit-btn">
+                            <span class="btn-text">ルームに参加</span>
+                            <div class="btn-loading" style="display: none;">
+                                <div class="spinner"></div>
+                                <span>参加中...</span>
+                            </div>
+                        </button>
+                    </form>
+                    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                        <div style="text-align: center; margin-bottom: 1rem;">
+                            <a href="/rooms" style="color: #7f8c8d; text-decoration: none; font-size: 0.9rem;">
+                                ← ルーム選択に戻る
+                            </a>
+                        </div>
+                        <div style="background-color: rgba(255, 193, 7, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255, 193, 7, 0.3);">
+                            <p style="margin: 0; font-size: 0.9rem; color: #856404;">
+                                <strong>💡 ヒント:</strong><br>
+                                ルームキーは友達が作成したルームの6桁のコードです。<br>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果表示エリア -->
+            <div id="result-section" class="result-section" style="display: none;">
+                <!-- ルーム参加成功時 -->
+                <div id="join-success" class="auth-box success-box" style="display: none;">
+                    <div class="result-icon">🎉</div>
+                    <h3 class="auth-title">ルームに参加しました！</h3>
+                    <div class="room-info">
+                        <div class="room-details">
+                            <p><strong>ルームキー:</strong> <span id="joined-room-key">------</span></p>
+                            <p><strong>現在の参加者:</strong> <span id="joined-current-players">2</span>人</p>
+                            <p><strong>最大プレイヤー数:</strong> <span id="joined-max-players">4</span>人</p>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem; color: #2c3e50;">参加中のプレイヤー:</h4>
+                            <div id="players-list"></div>
+                        </div>
+                        <div style="margin-top: 1rem; padding: 1rem; background-color: rgba(39, 174, 96, 0.1); border-radius: 8px; border: 1px solid rgba(39, 174, 96, 0.3);">
+                            <p style="margin: 0; font-size: 0.9rem; color: #1e5e35;">
+                                <strong>🚀 次のステップ:</strong><br>
+                                ロビーに入って、他のプレイヤーと一緒にゲーム開始を待ちましょう！
+                            </p>
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="enter-joined-lobby-btn" class="submit-btn">ロビーに入る</button>
+                        <button id="join-another-btn" class="secondary-btn">別のルームに参加</button>
+                        <button id="back-to-selection-btn" class="secondary-btn">ルーム選択に戻る</button>
+                    </div>
+                </div>
+
+                <!-- エラー表示 -->
+                <div id="error-display" class="auth-box error-box" style="display: none;">
+                    <div class="result-icon">❌</div>
+                    <h3 class="auth-title">参加に失敗しました</h3>
+                    <p id="error-message" class="error-message">エラーの詳細がここに表示されます</p>
+                    <div style="margin-top: 1rem; padding: 1rem; background-color: rgba(52, 152, 219, 0.1); border-radius: 8px; border: 1px solid rgba(52, 152, 219, 0.3);">
+                        <p style="margin: 0; font-size: 0.9rem; color: #2c3e50;">
+                            <strong>💡 よくあるエラー:</strong><br>
+                            • ルームキーが間違っている<br>
+                            • ルームが満室または削除されている<br>
+                            • ネットワーク接続に問題がある
+                        </p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="retry-btn" class="secondary-btn">再試行</button>
+                        <a href="/rooms" class="secondary-btn">ルーム選択に戻る</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

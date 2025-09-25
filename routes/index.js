@@ -23,4 +23,12 @@ router.get('/rooms', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'online', 'views', 'online_rooms.html'));
 });
 
+router.get('/rooms/create', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'online', 'views', 'online_room_create.html'));
+});
+
+router.get('/rooms/join', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'online', 'views', 'online_room_join.html'));
+});
+
 module.exports = router;

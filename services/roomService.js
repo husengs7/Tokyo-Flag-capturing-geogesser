@@ -18,18 +18,8 @@ class RoomService {
                 throw new Error('ホストユーザーが見つかりません');
             }
 
-            // 既存のアクティブなルームをチェック（ホストが他のルームにいないか）
-            const existingRoom = await Room.findOne({
-                $or: [
-                    { hostId: hostId },
-                    { 'players.userId': hostId }
-                ],
-                status: { $in: ['waiting', 'playing', 'ranking'] }
-            });
-
-            if (existingRoom) {
-                throw new Error('既に他のルームに参加しています');
-            }
+            // 新しいルーム作成前に、このユーザーの古いルームから退出
+            await this.leaveAllUserRooms(hostId);
 
             // ルーム作成（roomKeyはpre-saveフックで自動生成）
             const room = new Room({
@@ -59,6 +49,8 @@ class RoomService {
      */
     static async joinRoom(roomKey, userId) {
         try {
+            console.log(`[DEBUG] ルーム参加処理開始: ユーザー=${userId}, ルームキー=${roomKey}`);
+
             // ユーザーの存在確認
             const user = await User.findById(userId);
             if (!user) {
@@ -66,30 +58,44 @@ class RoomService {
             }
 
             // ルームの存在確認
-            const room = await Room.findOne({ roomKey });
+            let room = await Room.findOne({ roomKey });
             if (!room) {
                 throw new Error('ルームが見つかりません');
             }
+
+            console.log(`[DEBUG] 対象ルーム: ${room._id}, 現在のプレイヤー数: ${room.players.length}`);
 
             // ルーム状態チェック（待機中のみ参加可能）
             if (room.status !== 'waiting') {
                 throw new Error('このルームは現在参加できません');
             }
 
-            // 既に他のルームに参加していないかチェック
-            const existingRoom = await Room.findOne({
-                'players.userId': userId,
-                status: { $in: ['waiting', 'playing', 'ranking'] },
-                _id: { $ne: room._id }
+            // このユーザーが参加している全ルームを確認（デバッグ用）
+            const userRooms = await Room.find({
+                $or: [
+                    { hostId: userId },
+                    { 'players.userId': userId }
+                ],
+                status: { $in: ['waiting', 'playing', 'ranking'] }
             });
+            console.log(`[DEBUG] 参加前のユーザー関連ルーム数: ${userRooms.length}`);
 
-            if (existingRoom) {
-                throw new Error('既に他のルームに参加しています');
+            // 新しいルーム参加前に、このユーザーの古いルームから退出（参加対象ルームは除外）
+            // 注意：バリデーションはクリーンアップ後に行う
+            await this.leaveAllUserRooms(userId, room._id);
+
+            // クリーンアップ後にルームを再取得（データベースの最新状態を反映）
+            room = await Room.findOne({ roomKey });
+            if (!room) {
+                throw new Error('ルームが見つかりません');
             }
+
+            console.log(`[DEBUG] クリーンアップ後のルーム状態確認完了`);
 
             // ルームに参加
             await room.addPlayer(userId, user.username);
 
+            console.log(`[DEBUG] ルーム参加成功: ${room._id}`);
             return room;
         } catch (error) {
             console.error('ルーム参加エラー:', error);
@@ -286,6 +292,52 @@ class RoomService {
         } catch (error) {
             console.error('推測状態更新エラー:', error);
             throw error;
+        }
+    }
+
+    /**
+     * 指定ユーザーが参加している全てのアクティブルームから退出
+     * @param {string} userId - ユーザーID
+     * @param {string} excludeRoomId - 退出対象から除外するルームID（オプション）
+     * @returns {Promise<void>}
+     */
+    static async leaveAllUserRooms(userId, excludeRoomId = null) {
+        try {
+            // このユーザーが参加している全てのアクティブルームを取得
+            const query = {
+                $or: [
+                    { hostId: userId },
+                    { 'players.userId': userId }
+                ],
+                status: { $in: ['waiting', 'playing', 'ranking'] }
+            };
+
+            // 除外するルームがある場合は条件に追加
+            if (excludeRoomId) {
+                query._id = { $ne: excludeRoomId };
+            }
+
+            const userRooms = await Room.find(query);
+
+            if (userRooms.length > 0) {
+                console.log(`ユーザー ${userId} の ${userRooms.length} 個のアクティブルームから退出処理を開始`);
+
+                // 各ルームから退出
+                for (const room of userRooms) {
+                    try {
+                        await this.leaveRoom(room._id, userId);
+                        console.log(`ルーム ${room.roomKey} から退出完了`);
+                    } catch (error) {
+                        console.log(`ルーム ${room.roomKey} からの退出をスキップ: ${error.message}`);
+                        // 退出エラーは無視して続行（既に削除済み等）
+                    }
+                }
+
+                console.log(`ユーザー ${userId} の全ルーム退出処理完了`);
+            }
+        } catch (error) {
+            console.error('全ルーム退出エラー:', error);
+            // エラーが発生しても新しいルーム作成は続行
         }
     }
 

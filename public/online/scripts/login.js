@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (returnUrl) {
                     window.location.href = decodeURIComponent(returnUrl);
                 } else {
-                    window.location.href = '/online/views/online_rooms.html';
+                    window.location.href = '/rooms';
                 }
             }, 1500);
 
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (returnUrl) {
                     window.location.href = decodeURIComponent(returnUrl);
                 } else {
-                    window.location.href = '/online/views/online_rooms.html';
+                    window.location.href = '/rooms';
                 }
             }, 1500);
 
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const result = await apiRequest('/auth/me');
         if (result.success) {
             // 既にログイン済みの場合はreturnUrlがあればそこに、なければルーム一覧に遷移
-            console.log('既にログイン済み:', result.data.user);
+            console.log('既にログイン済み:', result.data);
             const urlParams = new URLSearchParams(window.location.search);
             const returnUrl = urlParams.get('returnUrl');
 

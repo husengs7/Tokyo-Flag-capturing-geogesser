@@ -11,6 +11,7 @@ router.use(requireAuth);
 // ルーム管理
 router.post('/rooms', multiController.createRoom); // ルーム作成
 router.post('/rooms/join', multiController.joinRoom); // ルーム参加
+router.post('/rooms/cleanup', multiController.cleanupUserRooms); // ユーザールームクリーンアップ
 router.get('/rooms/:roomId', multiController.getRoomInfo); // ルーム情報取得
 router.delete('/rooms/:roomId/leave', multiController.leaveRoom); // ルーム退出
 

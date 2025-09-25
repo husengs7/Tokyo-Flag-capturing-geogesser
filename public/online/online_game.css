@@ -10,7 +10,7 @@ body {
     background-color: #f0f2f5;
     color: #333;
     /* 背景画像設定（後から編集可能） */
-    background-image: url('images/morningsky.png'); /* ライト背景画像パス */
+    background-image: url('/images/morningsky.png'); /* ライト背景画像パス */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -19,16 +19,122 @@ body {
 
 /* ダークモード時の背景 */
 body.dark-mode {
-    background-image: url('images/nightsky.png'); /* ダーク背景画像パス */
+    background-image: url('/images/nightsky.png'); /* ダーク背景画像パス */
 }
 
-/* ヘッダータイトル */
-h1 {
+/* ゲーム情報ヘッダー */
+.game-header {
     text-align: center;
-    margin: 5px 0 10px 0;
-    font-size: 1.6em;
+    padding: 5px 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 2px solid #ddd;
+}
+
+.game-header h1 {
+    margin: 5px 0;
+    font-size: 1.4em;
     color: #1a73e8;
-    /* Google Blue */
+}
+
+.game-info {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 5px;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.round-info, .room-info {
+    color: #555;
+}
+
+/* ダークモード時のヘッダー */
+body.dark-mode .game-header {
+    background: rgba(50, 50, 50, 0.9);
+    color: white;
+}
+
+body.dark-mode .round-info,
+body.dark-mode .room-info {
+    color: #ddd;
+}
+
+/* プレイヤー情報パネル */
+#players-panel {
+    position: fixed;
+    top: 120px;
+    left: 15px;
+    width: 250px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    padding: 15px;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#players-panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    color: #1a73e8;
+    text-align: center;
+}
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin: 5px 0;
+    background: rgba(240, 240, 240, 0.8);
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.player-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.player-score {
+    color: #1a73e8;
+    font-weight: bold;
+}
+
+.player-status {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: white;
+}
+
+.status-guessing {
+    background-color: #ffa500;
+}
+
+.status-guessed {
+    background-color: #28a745;
+}
+
+.status-waiting {
+    background-color: #6c757d;
+}
+
+/* ダークモード時のプレイヤーパネル */
+body.dark-mode #players-panel {
+    background: rgba(50, 50, 50, 0.95);
+    border-color: #555;
+    color: white;
+}
+
+body.dark-mode .player-item {
+    background: rgba(70, 70, 70, 0.8);
+}
+
+body.dark-mode .player-name {
+    color: #ddd;
 }
 
 /* ゲームコンテナ */
@@ -59,16 +165,17 @@ h1 {
 #button-container {
     display: flex;
     justify-content: center;
-    gap: 20px;
+    gap: 15px;
     margin: 5px auto;
     height: 60px; /* ボタンエリアの高さを固定 */
     align-items: center; /* ボタンを縦中央に配置 */
+    flex-wrap: wrap; /* ボタンが多い場合に折り返し */
 }
 
 /* ボタンの基本スタイル */
 button {
-    padding: 10px 20px;
-    font-size: 1em;
+    padding: 10px 16px;
+    font-size: 0.9em;
     font-weight: bold;
     color: #fff;
     background-color: #1a73e8;
@@ -100,6 +207,33 @@ button {
     background-color: #6c757d;
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+/* 次のラウンドボタン */
+#next-round-button {
+    background-color: #17a2b8;
+}
+
+#next-round-button:hover:not(:disabled) {
+    background-color: #138496;
+}
+
+/* 結果表示ボタン */
+#view-results-button {
+    background-color: #6f42c1;
+}
+
+#view-results-button:hover:not(:disabled) {
+    background-color: #5a359a;
+}
+
+/* ゲーム退出ボタン */
+#leave-game-button {
+    background-color: #dc3545;
+}
+
+#leave-game-button:hover:not(:disabled) {
+    background-color: #c82333;
 }
 
 button:hover {
@@ -144,6 +278,105 @@ body.dark-mode #distance-display {
     color: white;
 }
 
+/* モーダルスタイル */
+.modal {
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+    text-align: center;
+    margin-top: 0;
+    color: #1a73e8;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* ダークモード時のモーダル */
+body.dark-mode .modal-content {
+    background-color: #2d2d2d;
+    color: white;
+}
+
+body.dark-mode .modal-content h2 {
+    color: #4db8ff;
+}
+
+/* ランキング表示 */
+.ranking-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin: 5px 0;
+    background: rgba(240, 240, 240, 0.8);
+    border-radius: 8px;
+    border-left: 4px solid #1a73e8;
+}
+
+.ranking-item.rank-1 {
+    background: rgba(255, 215, 0, 0.2);
+    border-left-color: #ffd700;
+}
+
+.ranking-item.rank-2 {
+    background: rgba(192, 192, 192, 0.2);
+    border-left-color: #c0c0c0;
+}
+
+.ranking-item.rank-3 {
+    background: rgba(205, 127, 50, 0.2);
+    border-left-color: #cd7f32;
+}
+
+.rank-position {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #1a73e8;
+    min-width: 40px;
+}
+
+.rank-name {
+    flex: 1;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.rank-score {
+    font-weight: bold;
+    color: #28a745;
+}
+
+/* ダークモード時のランキング */
+body.dark-mode .ranking-item {
+    background: rgba(70, 70, 70, 0.8);
+    color: white;
+}
+
 /* HINT機能の残り時間警告 */
 .hint-warning {
     color: #ff0000;
@@ -182,15 +415,15 @@ body.dark-mode #distance-display {
 }
 
 @keyframes countdown-pulse {
-    0% { 
+    0% {
         transform: scale(0.5);
         opacity: 0;
     }
-    50% { 
+    50% {
         transform: scale(1.2);
         opacity: 1;
     }
-    100% { 
+    100% {
         transform: scale(1);
         opacity: 1;
     }
@@ -607,3 +840,48 @@ body.dark-mode .memo-trash-box:hover {
     border-color: #e55a2b;
 }
 
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    #players-panel {
+        position: relative;
+        width: 100%;
+        left: auto;
+        top: auto;
+        margin: 10px;
+    }
+
+    .game-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    #button-container {
+        gap: 10px;
+        height: auto;
+        padding: 10px;
+    }
+
+    button {
+        padding: 8px 12px;
+        font-size: 0.8em;
+    }
+}
+
+/* 追加のボタンスタイル（共通クラス） */
+.submit-btn {
+    background-color: #1a73e8;
+    color: white;
+}
+
+.submit-btn:hover:not(:disabled) {
+    background-color: #155ab6;
+}
+
+.secondary-btn {
+    background-color: #6c757d;
+    color: white;
+}
+
+.secondary-btn:hover:not(:disabled) {
+    background-color: #545b62;
+}
