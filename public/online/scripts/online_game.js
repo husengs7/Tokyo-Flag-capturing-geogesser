@@ -854,7 +854,7 @@ async function revealDistance() {
             `目標まで約 ${Math.round(distance)}m`;
 
         // ヒント円を描画
-        drawHintCircle(currentPosition, distance);
+        drawHintCircle(targetLocation, distance);
 
         document.getElementById('reveal-distance-button').disabled = true;
 
