@@ -21,6 +21,7 @@ router.put('/rooms/:roomId/position', multiController.updatePosition); // 位置
 
 // ゲーム進行
 router.post('/rooms/:roomId/start', multiController.startGame); // ゲーム開始
+router.post('/rooms/:roomId/spawn-position', multiController.setSpawnPosition); // スポーン位置設定
 router.post('/rooms/:roomId/respawn', multiController.recordRespawn); // リスポーン記録
 router.post('/rooms/:roomId/guess', multiController.submitGuess); // 推測提出
 router.post('/rooms/:roomId/next-round', multiController.nextRound); // 次ラウンド開始

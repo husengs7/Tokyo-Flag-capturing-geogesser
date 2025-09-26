@@ -62,12 +62,12 @@ const gameStateSchema = new mongoose.Schema({
         lng: { type: Number, required: true }
     },
     playerStartLocation: {
-        lat: { type: Number, required: true }, // プレイヤーのスタート位置
-        lng: { type: Number, required: true }
+        lat: { type: Number, required: false }, // プレイヤーのスタート位置（マルチでは使用しない）
+        lng: { type: Number, required: false }
     },
     initialDistance: {
         type: Number,
-        required: true // スタート地点からフラッグまでの初期距離
+        required: false // スタート地点からフラッグまでの初期距離（マルチでは使用しない）
     },
     allPlayersGuessed: {
         type: Boolean,

@@ -8,15 +8,12 @@ const { calculateDistance, calculateScore } = require('../utils/gameUtils');
 class MultiGameService {
 
     /**
-     * 新しいマルチゲームを開始（3ラウンドの1ラウンド目）
+     * 新しいマルチゲームを開始
      * @param {string} roomId - ルームID
-     * @param {number} targetLat - フラッグの緯度
-     * @param {number} targetLng - フラッグの経度
-     * @param {number} playerLat - スタート位置の緯度
-     * @param {number} playerLng - スタート位置の経度
+     * @param {object} targetLocation - フラッグの位置 {lat, lng}
      * @returns {Promise<Room>} 更新されたルーム
      */
-    static async startMultiGame(roomId, targetLat, targetLng, playerLat, playerLng) {
+    static async startMultiGame(roomId, targetLocation) {
         try {
             const room = await Room.findById(roomId);
             if (!room) {
@@ -33,45 +30,22 @@ class MultiGameService {
                 throw new Error('全プレイヤーの準備が完了していません');
             }
 
-            // 初期距離を計算
-            const initialDistance = calculateDistance(playerLat, playerLng, targetLat, targetLng);
-
-            // 3km制限チェック - プレイヤーとターゲットの距離が3km以内であることを確認
-            if (initialDistance > 3000) {
-                throw new Error(`プレイヤー開始位置がターゲットから3km以上離れています (実際の距離: ${Math.round(initialDistance)}m)`);
-            }
-
-            // 最小距離チェック - あまりに近すぎる場合も制限
-            if (initialDistance < 100) {
-                throw new Error(`プレイヤー開始位置がターゲットに近すぎます (実際の距離: ${Math.round(initialDistance)}m)`);
-            }
-
-            console.log(`✅ 距離検証完了: ${Math.round(initialDistance)}m (100m-3000m圏内)`);
-
-            // ゲーム状態を更新
+            // ゲーム状態を更新（プレイヤー個別位置は削除）
             room.status = 'playing';
             room.gameState = {
                 currentRound: 1,
                 roundStartTime: new Date(),
-                targetLocation: { lat: targetLat, lng: targetLng },
-                // 注意: playerStartLocationは参考値のみ。各プレイヤーは個別にランダムスポーンする
-                playerStartLocation: { lat: playerLat, lng: playerLng },
-                initialDistance: Math.round(initialDistance),
+                targetLocation: targetLocation,
                 allPlayersGuessed: false,
                 rankingDisplayUntil: null
             };
 
-            // 全プレイヤーのスコア関連データをリセット
+            // 全プレイヤーのスコアをリセット（位置は各クライアントが個別設定）
             room.players.forEach(player => {
                 player.totalScore = 0;
                 player.gameScores = [];
                 player.hasGuessed = false;
-                // 注意: 各プレイヤーは個別にランダムスポーンするため、実際の位置はクライアント側で決定される
-                player.currentPosition = {
-                    lat: playerLat, // 参考値（実際はクライアントで個別決定）
-                    lng: playerLng, // 参考値（実際はクライアントで個別決定）
-                    timestamp: new Date()
-                };
+                // currentPositionは各クライアントが後で設定するため初期化しない
             });
 
             // 各プレイヤーのMultiGameRecordを作成
@@ -162,9 +136,12 @@ class MultiGameService {
                     lat: room.gameState.targetLocation.lat,
                     lng: room.gameState.targetLocation.lng
                 },
-                playerStartLocation: {
-                    lat: room.gameState.playerStartLocation.lat,
-                    lng: room.gameState.playerStartLocation.lng
+                playerStartLocation: player.currentPosition ? {
+                    lat: player.currentPosition.lat,
+                    lng: player.currentPosition.lng
+                } : {
+                    lat: room.gameState.targetLocation.lat,
+                    lng: room.gameState.targetLocation.lng
                 },
                 finalLocation: {
                     lat: guessLat,
@@ -246,7 +223,6 @@ class MultiGameService {
             room.gameState.currentRound++;
             room.gameState.roundStartTime = new Date();
             room.gameState.targetLocation = { lat: targetLat, lng: targetLng };
-            room.gameState.playerStartLocation = { lat: playerLat, lng: playerLng };
             room.gameState.initialDistance = Math.round(initialDistance);
             room.gameState.allPlayersGuessed = false;
             room.gameState.rankingDisplayUntil = null;
@@ -475,6 +451,48 @@ class MultiGameService {
 
         } catch (error) {
             console.error('リスポーン記録エラー:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * プレイヤーの現在位置を記録
+     * @param {string} roomId - ルームID
+     * @param {string} userId - プレイヤーのユーザーID
+     * @param {number} lat - 緯度
+     * @param {number} lng - 経度
+     * @returns {Promise<Object>} 処理結果
+     */
+    static async recordPlayerPosition(roomId, userId, lat, lng) {
+        try {
+            const room = await Room.findById(roomId);
+            if (!room) {
+                throw new Error('ルームが見つかりません');
+            }
+
+            // プレイヤー検索
+            const player = room.players.find(p => p.userId.toString() === userId.toString());
+            if (!player) {
+                throw new Error('このルームに参加していません');
+            }
+
+            // ゲーム中のみ位置を更新
+            if (room.status !== 'playing') {
+                return { success: false, message: 'ゲーム中ではありません' };
+            }
+
+            // 位置情報を更新
+            player.currentPosition = {
+                lat: lat,
+                lng: lng,
+                timestamp: new Date()
+            };
+
+            await room.save();
+            return { success: true };
+
+        } catch (error) {
+            console.error('プレイヤー位置情報の記録エラー:', error);
             throw error;
         }
     }

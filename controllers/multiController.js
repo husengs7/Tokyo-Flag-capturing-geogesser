@@ -1,6 +1,7 @@
 // マルチプレイ関連のコントローラー（ルーム管理、ゲーム進行、履歴取得）
 const RoomService = require('../services/roomService');
 const MultiGameService = require('../services/multiGameService');
+const Room = require('../models/Room');
 const { successResponse, errorResponse } = require('../utils/response');
 const { validateCoordinates } = require('../utils/gameUtils');
 
@@ -160,11 +161,10 @@ exports.setPlayerReady = async (req, res) => {
 exports.startGame = async (req, res) => {
     try {
         const { roomId } = req.params;
-        const { targetLat, targetLng, playerLat, playerLng } = req.body;
+        const { targetLocation } = req.body;
 
-        // 座標検証
-        if (!validateCoordinates(targetLat, targetLng) ||
-            !validateCoordinates(playerLat, playerLng)) {
+        // ターゲット座標検証
+        if (!targetLocation || !validateCoordinates(targetLocation.lat, targetLocation.lng)) {
             return errorResponse(res, '無効な座標です', 400);
         }
 
@@ -176,19 +176,60 @@ exports.startGame = async (req, res) => {
         }
 
         const updatedRoom = await MultiGameService.startMultiGame(
-            roomId, targetLat, targetLng, playerLat, playerLng
+            roomId, targetLocation
         );
 
         successResponse(res, {
             roomId: updatedRoom._id,
             gameState: updatedRoom.gameState,
             status: updatedRoom.status,
-            currentRound: updatedRoom.gameState.currentRound,
-            initialDistance: updatedRoom.gameState.initialDistance
+            currentRound: updatedRoom.gameState.currentRound
         }, '第1ラウンドを開始しました');
 
     } catch (error) {
         console.error('ゲーム開始エラー:', error);
+        errorResponse(res, error.message, 400);
+    }
+};
+
+// プレイヤーのスポーン位置を受信
+exports.setSpawnPosition = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+        const { lat, lng } = req.body;
+
+        // 座標検証
+        if (!validateCoordinates(lat, lng)) {
+            return errorResponse(res, '無効な座標です', 400);
+        }
+
+        // プレイヤーの現在位置を更新
+        const room = await Room.findById(roomId);
+        if (!room) {
+            return errorResponse(res, 'ルームが見つかりません', 404);
+        }
+
+        const player = room.players.find(p => p.userId.toString() === req.user._id.toString());
+        if (!player) {
+            return errorResponse(res, 'プレイヤーが見つかりません', 404);
+        }
+
+        player.currentPosition = {
+            lat: lat,
+            lng: lng,
+            timestamp: new Date()
+        };
+
+        await room.save();
+
+        console.log(`${player.username}のスポーン位置を設定: (${lat}, ${lng})`);
+
+        successResponse(res, {
+            position: player.currentPosition
+        }, 'スポーン位置を設定しました');
+
+    } catch (error) {
+        console.error('スポーン位置設定エラー:', error);
         errorResponse(res, error.message, 400);
     }
 };

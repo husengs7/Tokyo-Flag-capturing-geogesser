@@ -28,22 +28,22 @@ let longPressTimer = null;
 const MAX_RETRIES = 10;
 const SCORE_CONSTANT = 3;
 
-// 東京23区の詳細な境界ポリゴン定義
+// 東京23区の正確な境界ポリゴン定義（game.jsと同一）
 const TOKYO_23_WARDS_POLYGON = [
-    // 千代田区・中央区・港区エリア
+    // 千代田区・中央区・港区エリア（南東から時計回り）
     [35.676, 139.692], [35.690, 139.701], [35.695, 139.715], [35.686, 139.723],
     [35.680, 139.740], [35.670, 139.748], [35.660, 139.752], [35.648, 139.747],
     [35.642, 139.737], [35.639, 139.725], [35.645, 139.710],
 
-    // 新宿区・渋谷区エリア
+    // 新宿区・渋谷区エリア（西部）
     [35.658, 139.690], [35.670, 139.685], [35.685, 139.690], [35.693, 139.678],
     [35.702, 139.683], [35.708, 139.695], [35.715, 139.702], [35.720, 139.715],
 
-    // 豊島区・文京区エリア
+    // 豊島区・文京区エリア（中央北部）
     [35.728, 139.720], [35.735, 139.710], [35.742, 139.715], [35.748, 139.725],
     [35.755, 139.735], [35.762, 139.745], [35.768, 139.752],
 
-    // 北区・荒川区・台東区エリア
+    // 北区・荒川区・台東区エリア（北部）
     [35.775, 139.758], [35.785, 139.765], [35.795, 139.772], [35.805, 139.780],
     [35.815, 139.785], [35.825, 139.792], [35.835, 139.800],
 
@@ -59,7 +59,7 @@ const TOKYO_23_WARDS_POLYGON = [
     [35.815, 139.835], [35.805, 139.828], [35.795, 139.820], [35.785, 139.812],
     [35.775, 139.805], [35.765, 139.798], [35.755, 139.792],
 
-    // 中央区・港区南部（東京湾沿い、水域除外）
+    // 中央区・港区南部（東京湾沿い）
     [35.745, 139.785], [35.735, 139.778], [35.725, 139.770], [35.715, 139.762],
     [35.705, 139.755], [35.695, 139.748], [35.685, 139.742],
 
@@ -95,7 +95,7 @@ const TOKYO_23_WARDS_POLYGON = [
     [35.676, 139.692]
 ];
 
-// 主要な水域の除外ポリゴン
+// 主要な水域の除外ポリゴン（game.jsと同一）
 const WATER_EXCLUSION_ZONES = [
     // 東京湾
     {
@@ -221,6 +221,11 @@ let pollInterval = null;
 let hasSubmittedGuess = false;
 let isGameComplete = false;
 
+// WebSocket関連
+let socket = null;
+let playerPositionMarkers = new Map(); // 他プレイヤーの位置マーカー管理
+let positionUpdateInterval = null; // 定期的な位置送信用
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Online game page loading...');
@@ -257,13 +262,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ダークモードの初期化
         initializeDarkMode();
 
+        // WebSocket接続初期化
+        initializeWebSocket();
+
         // イベントリスナーの設定
         setupEventListeners();
 
         // ゲーム状態の取得
         await initializeGame();
 
-        // 定期的な状態更新を開始
+        // 定期的な状態更新を開始（WebSocketの補完用）
         startGamePolling();
 
     } catch (error) {
@@ -271,6 +279,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         showError('ゲームの初期化に失敗しました');
     }
 });
+
+// WebSocket初期化
+function initializeWebSocket() {
+    if (typeof io === 'undefined') {
+        console.warn('Socket.ioが読み込まれていません - リアルタイム機能は無効です');
+        return;
+    }
+
+    // Socket.io接続
+    socket = io({
+        auth: {
+            sessionId: currentUser?.id
+        }
+    });
+
+    // 接続成功
+    socket.on('connect', () => {
+        console.log('🔗 WebSocket connected:', {
+            socketId: socket.id,
+            userId: currentUser?.id,
+            username: currentUser?.username
+        });
+
+        // ルームに参加（ルーム情報取得後に行う）
+        // initializeGameで設定する
+    });
+
+    // 他プレイヤーの位置更新を受信
+    socket.on('player-position-updated', (data) => {
+        console.log('📍 他プレイヤー位置更新受信:', {
+            userId: data.userId,
+            username: data.username,
+            position: {
+                lat: data.position.lat.toFixed(6),
+                lng: data.position.lng.toFixed(6)
+            },
+            timestamp: data.position.timestamp
+        });
+        updatePlayerPositionMarker(data);
+    });
+
+    // プレイヤー推測完了通知を受信
+    socket.on('player-guessed', (data) => {
+        console.log(`${data.username} が推測完了: ${data.score}点`);
+        updatePlayersPanel(); // プレイヤー状態を更新
+    });
+
+    // エラーハンドリング
+    socket.on('connect_error', (error) => {
+        console.error('WebSocket接続エラー:', error);
+    });
+
+    socket.on('error', (error) => {
+        console.error('WebSocketエラー:', error);
+        showError(`リアルタイム通信エラー: ${error.message}`);
+    });
+}
 
 // ダークモード初期化
 function initializeDarkMode() {
@@ -339,6 +404,28 @@ async function initializeGame() {
             } else {
                 window.initMap = initializeMap;
             }
+        }
+
+        // WebSocketでルームに参加
+        if (socket && socket.connected && roomKey) {
+            console.log('🔗 WebSocketルーム参加試行:', { roomKey, userId: currentUser?.id });
+            socket.emit('join-room', { roomKey: roomKey });
+
+            // ルーム参加成功のリスナー
+            socket.on('room-joined', (data) => {
+                console.log('✅ WebSocketルーム参加成功:', data);
+            });
+
+            // ルーム参加エラーのリスナー
+            socket.on('room-join-error', (error) => {
+                console.error('❌ WebSocketルーム参加エラー:', error);
+                showError(`リアルタイム機能エラー: ${error.message}`);
+            });
+        } else {
+            console.warn('WebSocket接続またはルームキーが無効:', {
+                socketConnected: socket?.connected,
+                roomKey: roomKey
+            });
         }
 
     } catch (error) {
@@ -446,20 +533,26 @@ function updateButtonVisibility(roomData) {
 function initializeMap() {
     if (!gameState) return;
 
+    // 東京周辺の初期位置を設定
+    const tokyoCenter = { lat: 35.6762, lng: 139.6503 };
+
     // マップの初期化
     map = new google.maps.Map(document.getElementById('map'), {
         zoom: 10,
-        center: gameState.playerStartLocation,
+        center: tokyoCenter,
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         streetViewControl: false, // ペグマン削除
         fullscreenControl: true,
         mapTypeControl: false
     });
 
+    // スポーン位置を生成してストリートビューを初期化
+    const spawnPosition = generateRandomSpawnPosition(gameState.targetLocation);
+
     // ストリートビューの初期化
     panorama = new google.maps.StreetViewPanorama(
         document.getElementById('pano'), {
-            position: gameState.playerStartLocation, // 初期位置は後で適切な場所に変更
+            position: spawnPosition, // ランダムなスポーン位置を使用
             pov: { heading: 0, pitch: 0 },
             zoom: 1,
             fullscreenControl: true,
@@ -473,8 +566,31 @@ function initializeMap() {
     map.setStreetView(panorama);
     streetViewService = new google.maps.StreetViewService();
 
-    targetLocation = gameState.targetLocation;
-    initialPlayerLocation = gameState.playerStartLocation;
+    // プレイヤー位置変更の検出
+    panorama.addListener('position_changed', () => {
+        const currentPosition = panorama.getPosition();
+        if (currentPosition && socket && socket.connected) {
+            // リアルタイムで位置をサーバーに送信
+            const positionData = {
+                roomId: roomId,
+                lat: currentPosition.lat(),
+                lng: currentPosition.lng()
+            };
+
+            socket.emit('update-position', positionData);
+            console.log('📍 手動位置更新送信:', {
+                lat: currentPosition.lat().toFixed(6),
+                lng: currentPosition.lng().toFixed(6)
+            });
+        }
+    });
+
+    // targetLocationをGoogle Maps LatLngオブジェクトに変換
+    targetLocation = new google.maps.LatLng(gameState.targetLocation.lat, gameState.targetLocation.lng);
+
+    // 初期位置はクライアント側でスポーン時に設定するため削除
+    initialPlayerLocation = null;
+
     initialPlayerDistance = gameState.initialDistance;
 
     // フラッグマーカーを常時表示
@@ -491,147 +607,117 @@ function initializeMap() {
     console.log('Map initialized for multiplayer game');
 }
 
-// 各プレイヤーが個別にランダムスポーンする位置設定
-function setPlayerStartPosition() {
+// クライアント側で個別スポーン位置を生成
+async function setPlayerStartPosition() {
     if (!targetLocation) {
         console.error('ターゲット位置が設定されていません');
         return;
     }
 
-    console.log('🎲 各プレイヤー個別ランダムスポーン開始...');
+    console.log('🎲 クライアント側で個別スポーン位置を生成中...');
 
-    let attempts = 0;
-    const maxAttempts = 100; // リスポーンと同じく十分な試行回数に増加
+    // 各クライアントがランダムなスポーン位置を生成
+    const playerStartPos = generateRandomSpawnPosition(targetLocation);
 
-    function trySetRandomPosition() {
-        if (attempts >= maxAttempts) {
-            // 最大試行回数に達した場合はフラッグ位置から開始
-            console.warn('⚠️ 最大試行回数に達しました。ターゲット位置からスタートします');
-            panorama.setPosition(targetLocation);
-            // 初期位置記録
-            initialPlayerLocation = {
-                lat: targetLocation.lat(),
-                lng: targetLocation.lng()
-            };
-            return;
-        }
+    console.log('🎯 個別スポーン位置を生成:', {
+        lat: playerStartPos.lat(),
+        lng: playerStartPos.lng(),
+        player: currentUser.username
+    });
 
-        // フラッグから300m～3km圏内の完全ランダム位置を生成（各プレイヤー独立）
-        const angle = Math.random() * 2 * Math.PI;
-        const distance = 300 + Math.random() * 2700; // 300m～3000m
-        const randomStartPos = google.maps.geometry.spherical.computeOffset(targetLocation, distance, angle * 180 / Math.PI);
+    // 即座にパノラマ位置を設定
+    panorama.setPosition(playerStartPos);
 
-        console.log(`🎯 プレイヤー専用ランダム位置生成: 試行${attempts + 1}, 角度${(angle * 180 / Math.PI).toFixed(1)}°, 距離${distance.toFixed(0)}m`);
-        console.log(`📍 座標: (${randomStartPos.lat().toFixed(6)}, ${randomStartPos.lng().toFixed(6)})`);
+    // 初期位置記録
+    initialPlayerLocation = {
+        lat: playerStartPos.lat(),
+        lng: playerStartPos.lng()
+    };
 
-        // より柔軟な位置チェック（段階的制約緩和）
-        let isValid = false;
-        if (attempts < 15) {
-            // 最初15回は厳格チェック（23区内 + 水域除外）
-            isValid = isValidLocation(randomStartPos.lat(), randomStartPos.lng());
-        } else if (attempts < 30) {
-            // 16-30回は緩めのチェック（23区内のみ）
-            isValid = pointInPolygon(randomStartPos.lat(), randomStartPos.lng(), TOKYO_23_WARDS_POLYGON);
-            if (isValid && attempts === 15) {
-                console.log('🔄 初期スポーン: 水域制限を緩めて位置を選択');
-            }
-        } else {
-            // 31回以降はさらに緩めのチェック（東京都内の広範囲）
-            const tokyoBounds = {
-                north: 35.9,
-                south: 35.5,
-                east: 139.9,
-                west: 139.3
-            };
-            const lat = randomStartPos.lat();
-            const lng = randomStartPos.lng();
-            isValid = (lat >= tokyoBounds.south && lat <= tokyoBounds.north &&
-                      lng >= tokyoBounds.west && lng <= tokyoBounds.east);
-            if (isValid && attempts === 30) {
-                console.log('🔄 初期スポーン: さらに制限を緩めて東京都内で位置を選択');
-            }
-        }
+    // 初期距離を計算
+    initialPlayerDistance = google.maps.geometry.spherical.computeDistanceBetween(
+        playerStartPos,
+        targetLocation
+    );
 
-        if (!isValid) {
-            console.log(`❌ 無効な位置 - 再生成 (試行 ${attempts + 1}/${maxAttempts})`);
-            attempts++;
-            // 再帰の代わりにsetTimeoutを使用
-            setTimeout(() => trySetRandomPosition(), 10);
-            return;
-        }
+    console.log(`✅ 個別スポーン完了: 距離=${Math.round(initialPlayerDistance)}m`);
 
-        // ストリートビューが利用可能かチェック
-        fetch('/api/streetview/check', {
+    // スポーン位置をサーバーに送信
+    await sendSpawnPositionToServer(initialPlayerLocation);
+
+    // オンライン用のゲームセッション開始
+    startOnlineGameSession(targetLocation, playerStartPos);
+}
+
+// ランダムスポーン位置生成（3km圏内）
+function generateRandomSpawnPosition(targetLocation) {
+    const angle = Math.random() * 2 * Math.PI;
+    const distance = 500 + Math.random() * 2500; // 500m～3000m
+
+    // Google Maps geometryを使用して正確な座標計算
+    return google.maps.geometry.spherical.computeOffset(
+        targetLocation,
+        distance,
+        angle * 180 / Math.PI
+    );
+}
+
+// スポーン位置をサーバーに送信
+async function sendSpawnPositionToServer(spawnPosition) {
+    try {
+        const response = await fetch(`/multi/rooms/${roomId}/spawn-position`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify({
-                lat: randomStartPos.lat(),
-                lng: randomStartPos.lng(),
-                radius: 300  // 各プレイヤーの位置を厳格チェック
+                lat: spawnPosition.lat,
+                lng: spawnPosition.lng
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            const streetViewData = data.success ? data.data : data;
-            if (streetViewData.status === 'OK') {
-                const playerStartPosition = new google.maps.LatLng(streetViewData.location.lat, streetViewData.location.lng);
-                panorama.setPosition(playerStartPosition);
-
-                // この プレイヤー専用の初期位置を記録
-                initialPlayerLocation = {
-                    lat: playerStartPosition.lat(),
-                    lng: playerStartPosition.lng()
-                };
-
-                // 初期距離を再計算
-                initialPlayerDistance = google.maps.geometry.spherical.computeDistanceBetween(
-                    playerStartPosition,
-                    targetLocation
-                );
-
-                console.log(`✅ このプレイヤー専用のストリートビュー位置を設定: 距離=${Math.round(initialPlayerDistance)}m`);
-                console.log(`🎮 個別ランダムスポーン完了 - 各プレイヤーが異なる場所からスタート`);
-
-                // オンライン用のゲームセッション開始（game.jsのstartGameSessionの代替）
-                startOnlineGameSession(targetLocation, playerStartPosition);
-            } else {
-                console.log(`❌ ストリートビューが利用できません。再試行... (status: ${streetViewData.status})`);
-                attempts++;
-                // 再帰の代わりにsetTimeoutを使用
-                setTimeout(() => trySetRandomPosition(), 100);
-            }
-        })
-        .catch(error => {
-            console.error('ストリートビュー確認エラー:', error);
-            attempts++;
-            // 再帰の代わりにsetTimeoutを使用
-            setTimeout(() => trySetRandomPosition(), 100);
         });
-    }
 
-    // 個別ランダムスポーン開始
-    trySetRandomPosition();
+        const data = await response.json();
+        if (data.success) {
+            console.log('✅ スポーン位置をサーバーに送信完了');
+
+            // WebSocketでリアルタイム位置更新も送信
+            if (socket && socket.connected) {
+                socket.emit('update-position', {
+                    roomId: roomId,
+                    lat: spawnPosition.lat,
+                    lng: spawnPosition.lng
+                });
+            }
+        } else {
+            console.warn('⚠️ スポーン位置送信に失敗:', data.message);
+        }
+    } catch (error) {
+        console.error('❌ スポーン位置送信エラー:', error);
+    }
 }
 
 // オンライン用ゲームセッション開始（game.jsのstartGameSessionを参考）
 function startOnlineGameSession(targetPos, playerPos) {
+    // targetPosとplayerPosの型を統一（Google Maps LatLng形式に変換）
+    const targetLatLng = targetPos instanceof google.maps.LatLng ? targetPos : new google.maps.LatLng(targetPos.lat, targetPos.lng);
+    const playerLatLng = playerPos instanceof google.maps.LatLng ? playerPos : new google.maps.LatLng(playerPos.lat, playerPos.lng);
+
     // 初期プレイヤー位置を記録（game.jsと同様）
     initialPlayerLocation = {
-        lat: playerPos.lat(),
-        lng: playerPos.lng()
+        lat: playerLatLng.lat(),
+        lng: playerLatLng.lng()
     };
 
     // 初期距離を記録
     initialPlayerDistance = google.maps.geometry.spherical.computeDistanceBetween(
-        playerPos,
-        targetPos
+        playerLatLng,
+        targetLatLng
     );
 
     console.log('🎮 オンラインゲームセッション開始 (個別ランダムスポーン):', {
-        target: { lat: targetPos.lat(), lng: targetPos.lng() },
-        player: { lat: playerPos.lat(), lng: playerPos.lng() },
+        target: { lat: targetLatLng.lat(), lng: targetLatLng.lng() },
+        player: { lat: playerLatLng.lat(), lng: playerLatLng.lng() },
         distance: Math.round(initialPlayerDistance) + 'm',
         note: '各プレイヤーが異なるランダム位置からスタート'
     });
@@ -653,6 +739,9 @@ function startOnlineGameSession(targetPos, playerPos) {
     if (guessButton) guessButton.disabled = true;
     if (hintButton) hintButton.disabled = false;
     if (respawnButton) respawnButton.disabled = false;
+
+    // 定期的な位置送信を開始（3秒間隔）
+    startPeriodicPositionUpdate();
 }
 
 // 目的地フラッグを常時表示する設定（game.jsから移植）
@@ -785,6 +874,10 @@ async function submitGuess() {
 
         if (data.success) {
             hasSubmittedGuess = true;
+
+            // 推測完了時は位置送信を停止
+            stopPeriodicPositionUpdate();
+
             processGuessResult(data.data);
         } else {
             showError(data.message || '推測の送信に失敗しました');
@@ -1140,6 +1233,9 @@ function resetRoundState() {
         hintCircle.setMap(null);
         hintCircle = null;
     }
+
+    // 他プレイヤーの位置マーカーもクリア
+    clearPlayerPositionMarkers();
 
     // ヒントタイマークリア
     if (hintCountdownInterval) {
@@ -1506,6 +1602,130 @@ function triggerCelebration(score) {
             });
         }
     }
+}
+
+// 他プレイヤーの位置マーカー更新
+function updatePlayerPositionMarker(data) {
+    if (!map || !data.userId || data.userId === currentUser.id) return;
+
+    const { userId, username, position } = data;
+
+    // 既存のマーカーを削除
+    if (playerPositionMarkers.has(userId)) {
+        playerPositionMarkers.get(userId).setMap(null);
+    }
+
+    // 現在地マークスタイルのマーカーを作成
+    const marker = new google.maps.Marker({
+        position: { lat: position.lat, lng: position.lng },
+        map: map,
+        title: `${username}の現在位置`,
+        icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+                    <!-- 外側の薄い円（精度範囲を表現） -->
+                    <circle cx="16" cy="16" r="14" fill="rgba(66, 133, 244, 0.2)" stroke="rgba(66, 133, 244, 0.3)" stroke-width="1">
+                        <animate attributeName="r" values="14;16;14" dur="2s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.2;0.1;0.2" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- 中間の円 -->
+                    <circle cx="16" cy="16" r="10" fill="rgba(66, 133, 244, 0.3)" stroke="rgba(66, 133, 244, 0.5)" stroke-width="1">
+                        <animate attributeName="r" values="10;12;10" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- 内側の濃い青色の中心点 -->
+                    <circle cx="16" cy="16" r="6" fill="#4285f4" stroke="white" stroke-width="2"/>
+                    <!-- 中央の白い点 -->
+                    <circle cx="16" cy="16" r="3" fill="white"/>
+                    <!-- ユーザーアイコン -->
+                    <text x="16" y="20" text-anchor="middle" font-size="8" fill="#4285f4" font-weight="bold">👤</text>
+                </svg>
+            `),
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 16)
+        },
+        zIndex: 999
+    });
+
+    // マーカーに情報ウィンドウを追加
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div style="padding: 8px; text-align: center; min-width: 120px;">
+                <div style="font-weight: bold; font-size: 14px; color: #4285f4; margin-bottom: 4px;">
+                    👤 ${username}
+                </div>
+                <div style="font-size: 11px; color: #666; background: #f5f5f5; padding: 3px 6px; border-radius: 12px;">
+                    🕐 ${new Date(position.timestamp).toLocaleTimeString()}
+                </div>
+                <div style="font-size: 10px; color: #999; margin-top: 4px;">
+                    リアルタイム位置
+                </div>
+            </div>
+        `
+    });
+
+    marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+    });
+
+    // マーカーを保存
+    playerPositionMarkers.set(userId, marker);
+
+    console.log(`🎯 ${username}の位置を更新: (${position.lat.toFixed(6)}, ${position.lng.toFixed(6)})`);
+}
+
+// 定期的な位置送信を開始
+function startPeriodicPositionUpdate() {
+    // 既存の間隔があれば停止
+    stopPeriodicPositionUpdate();
+
+    positionUpdateInterval = setInterval(() => {
+        if (panorama && socket && socket.connected && roomId) {
+            const currentPosition = panorama.getPosition();
+            if (currentPosition) {
+                const positionData = {
+                    roomId: roomId,
+                    lat: currentPosition.lat(),
+                    lng: currentPosition.lng()
+                };
+
+                socket.emit('update-position', positionData);
+                console.log('🌍 定期位置更新送信:', {
+                    roomId: roomId,
+                    lat: currentPosition.lat().toFixed(6),
+                    lng: currentPosition.lng().toFixed(6),
+                    socketConnected: socket.connected
+                });
+            } else {
+                console.warn('⚠️ 現在位置が取得できません');
+            }
+        } else {
+            console.warn('⚠️ 位置送信スキップ:', {
+                panorama: !!panorama,
+                socket: !!socket,
+                connected: socket?.connected,
+                roomId: roomId
+            });
+        }
+    }, 500); // 0.5秒間隔
+
+    console.log('▶️ 定期位置送信開始 (0.5秒間隔)');
+}
+
+// 定期的な位置送信を停止
+function stopPeriodicPositionUpdate() {
+    if (positionUpdateInterval) {
+        clearInterval(positionUpdateInterval);
+        positionUpdateInterval = null;
+        console.log('⏹️ 定期位置送信停止');
+    }
+}
+
+// 全プレイヤー位置マーカーをクリア
+function clearPlayerPositionMarkers() {
+    playerPositionMarkers.forEach(marker => {
+        marker.setMap(null);
+    });
+    playerPositionMarkers.clear();
 }
 
 // エラー表示
